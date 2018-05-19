@@ -12,6 +12,5 @@ workflow_designer/blocks
 workflow_designer/workflow_blocks.js
 
 .idea
-.gitignore
 target
 
