@@ -6,15 +6,15 @@ import static cz.zcu.kiv.WorkflowDesigner.Type.STRING;
 import static cz.zcu.kiv.WorkflowDesigner.WorkflowCardinality.ONE_TO_ONE;
 
 @BlockType(type ="ARITHMETIC", family = "MATH")
-public class TestBlock {
+public class ArithmeticBlock {
 
-    @BlockInput(name = "operand_1", type = NUMBER, cardinality = ONE_TO_ONE)
+    @BlockInput(name = "operand1", type = NUMBER, cardinality = ONE_TO_ONE)
     private int op1=10;
 
-    @BlockInput(name = "operand_2", type = NUMBER, cardinality = ONE_TO_ONE)
+    @BlockInput(name = "operand2", type = NUMBER, cardinality = ONE_TO_ONE)
     private int op2=7;
 
-    @BlockOutput(name = "operand_1", type = NUMBER, cardinality = ONE_TO_ONE)
+    @BlockOutput(name = "operand3", type = NUMBER, cardinality = ONE_TO_ONE)
     private int op3=0;
 
     @BlockProperty(name ="operation", type = STRING ,defaultValue = "add")

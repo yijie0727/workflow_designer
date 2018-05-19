@@ -41,7 +41,7 @@ import java.util.Set;
  **********************************************************************************************************************/
 public class Workflow {
 
-    private static String PACKAGE;
+    public static String PACKAGE;
     private static String WORKFLOW_DESIGNER_DIRECTORY;
     private static final String BLOCK_DEFINTION_DIRECTORY ="blocks/";
     private static final String WORKFLOW_BLOCKS_FILE="workflow_blocks.js";
@@ -139,7 +139,7 @@ public class Workflow {
             Block block = null;
 
             //get Block object by type of block in JSON
-            Set<Class<?>> block_types = new Reflections("cz.zcu.kiv").getTypesAnnotatedWith(BlockType.class);
+            Set<Class<?>> block_types = new Reflections(PACKAGE).getTypesAnnotatedWith(BlockType.class);
             for(Class block_type:block_types){
                 Annotation annotation = block_type.getAnnotation(BlockType.class);
                 Class<? extends Annotation> type = annotation.annotationType();
@@ -160,9 +160,6 @@ public class Workflow {
             }
             //Initialize the block I/O and configurations
             block.initialize();
-
-
-
 
             //Intitalize values from the JSONObject
             block.fromJSON(block_object);

@@ -1,7 +1,12 @@
 package test;
 import cz.zcu.kiv.WorkflowDesigner.Workflow;
+import org.apache.commons.io.FileUtils;
+import org.json.JSONObject;
 import org.junit.Test;
+
+import java.io.File;
 import java.io.IOException;
+import java.nio.charset.Charset;
 
 
 /***********************************************************************************************************************
@@ -34,6 +39,14 @@ public class WorkflowDesignerTest {
     @Test
     public void testBlock() throws IOException {
         Workflow.initializeBlocks("workflow_designer/","test");
+    }
+
+    @Test
+    public void testJSON() throws Exception {
+        Workflow.PACKAGE="test";
+        String json = FileUtils.readFileToString(new File("workflow_designer/test.json"),Charset.defaultCharset());
+        JSONObject jsonObject = new JSONObject(json);
+        Workflow.execute(jsonObject);
     }
 
 

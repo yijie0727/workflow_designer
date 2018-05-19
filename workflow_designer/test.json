@@ -1,0 +1,62 @@
+{
+  "edges": [
+    {
+      "id": 1,
+      "block1": 1,
+      "connector1": [
+        "operand",
+        "output"
+      ],
+      "block2": 2,
+      "connector2": [
+        "operand1",
+        "input"
+      ]
+    },
+    {
+      "id": 2,
+      "block1": 3,
+      "connector1": [
+        "operand",
+        "output"
+      ],
+      "block2": 2,
+      "connector2": [
+        "operand2",
+        "input"
+      ]
+    }
+  ],
+  "blocks": [
+    {
+      "id": 1,
+      "x": -295.75,
+      "y": -199,
+      "type": "CONSTANT",
+      "module": null,
+      "values": {
+        "value": "5"
+      }
+    },
+    {
+      "id": 2,
+      "x": -88.75,
+      "y": -138,
+      "type": "ARITHMETIC",
+      "module": null,
+      "values": {
+        "operation": "add"
+      }
+    },
+    {
+      "id": 3,
+      "x": -295.75,
+      "y": -80,
+      "type": "CONSTANT",
+      "module": null,
+      "values": {
+        "value": "10"
+      }
+    }
+  ]
+}

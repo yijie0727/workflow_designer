@@ -184,7 +184,8 @@ public class Block {
                 Data source_data=null;
                 for(String source_key:source_params.keySet()){
                     if(source_key.equals(key.toLowerCase())){
-                        source_data=source.get(key);
+                        source_data=source.get(source_params.get(key));
+                        break;
                     }
                 }
                 Object value = null;
