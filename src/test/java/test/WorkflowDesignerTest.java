@@ -47,6 +47,7 @@ public class WorkflowDesignerTest {
         String json = FileUtils.readFileToString(new File("workflow_designer/test.json"),Charset.defaultCharset());
         JSONObject jsonObject = new JSONObject(json);
         Workflow.execute(jsonObject);
+        assert  ArithmeticBlock.getOp3()==15;
     }
 
 

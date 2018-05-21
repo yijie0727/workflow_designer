@@ -6,7 +6,6 @@
     blocks = new Blocks();
     include('workflow_blocks.js');
     include('scene.js');
-
     blocks.types.addCompatibility('string', 'number');
     blocks.types.addCompatibility('string', 'bool');
     blocks.types.addCompatibility('bool', 'number');
@@ -18,7 +17,23 @@
 
     blocks.ready(function() {
 	blocks.menu.addAction('Export', function(blocks) {
-	    console.log($.toJSON(blocks.export()));
+
+        function saveToFile(text) {
+                var pom = document.createElement('a');
+                pom.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
+                pom.setAttribute('download', "export.json");
+
+                if (document.createEvent) {
+                    var event = document.createEvent('MouseEvents');
+                    event.initEvent('click', true, true);
+                    pom.dispatchEvent(event);
+                }
+                else {
+                    pom.click();
+                }
+        }
+
+        saveToFile(JSON.stringify(blocks.export(),null,4));
 	}, 'export');
 
         $('.setLabel').click(function() {

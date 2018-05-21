@@ -9,13 +9,13 @@ import static cz.zcu.kiv.WorkflowDesigner.WorkflowCardinality.ONE_TO_ONE;
 public class ArithmeticBlock {
 
     @BlockInput(name = "operand1", type = NUMBER, cardinality = ONE_TO_ONE)
-    private int op1=10;
+    private int op1=0;
 
     @BlockInput(name = "operand2", type = NUMBER, cardinality = ONE_TO_ONE)
-    private int op2=7;
+    private int op2=0;
 
     @BlockOutput(name = "operand3", type = NUMBER, cardinality = ONE_TO_ONE)
-    private int op3=0;
+    private static int op3=0;
 
     @BlockProperty(name ="operation", type = STRING ,defaultValue = "add")
     private String operation;
@@ -30,5 +30,9 @@ public class ArithmeticBlock {
                 op3=op1-op2;
                 break;
         }
+    }
+
+    public static int getOp3() {
+        return op3;
     }
 }
