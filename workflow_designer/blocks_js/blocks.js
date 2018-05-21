@@ -2264,7 +2264,12 @@ Blocks.prototype.addBlock = function(name, x, y)
  */
 Blocks.prototype.register = function(meta)
 {
-    this.metas.push(new Meta(meta));
+    if(Array.isArray(meta)){
+        for(var i=0;i<meta.length;i++){
+            this.metas.push(new Meta(meta[i]));
+        }
+    }
+    else this.metas.push(new Meta(meta));
 };
 
 /**

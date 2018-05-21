@@ -41,12 +41,14 @@ import java.util.Set;
  **********************************************************************************************************************/
 public class Workflow {
 
-    public static String PACKAGE;
-    private static String WORKFLOW_DESIGNER_DIRECTORY;
-    private static final String BLOCK_DEFINTION_DIRECTORY ="blocks/";
-    private static final String WORKFLOW_BLOCKS_FILE="workflow_blocks.js";
+    private String package_name;
+
 
     private static ArrayList<Block> block_definitions = null;
+
+    public Workflow(String package_name){
+        this.package_name = package_name;
+    }
 
     /**
      * intializeBlocks - Joey Pinto
@@ -54,28 +56,15 @@ public class Workflow {
      * This method intializes a directory made up of javascript files with all annotated blocktypes
      * @throws IOException - Exception if there is a problem creating directories
      */
-    public static void initializeBlocks(String workflow_designer_directory, String package_name) throws IOException {
-        WORKFLOW_DESIGNER_DIRECTORY=workflow_designer_directory;
-        PACKAGE = package_name;
-        String blocks_folder=WORKFLOW_DESIGNER_DIRECTORY +File.separator+BLOCK_DEFINTION_DIRECTORY;
-        FileUtils.deleteDirectory(new File(blocks_folder));
-        new File(blocks_folder).mkdirs();
-
-        //include function definition, can be eliminated later
-        FileUtils.writeStringToFile(new File(WORKFLOW_DESIGNER_DIRECTORY +WORKFLOW_BLOCKS_FILE),
-                "function include(file) {\n" +
-                        "\t$('head').append('<script type=\"text/javascript\" src=\"'+file+'\"></script>');\n" +
-                        "}\n");
+    public  JSONArray initializeBlocks(String workflow_blocks_file) throws IOException {
+        JSONArray blocks_array=new JSONArray();
 
         for(Block block:getBlockDefinitions()){
-            //Write JS file description of block to individual file
-            String filename= blocks_folder + block.getFamily()+File.separator+block.getName()+".js";
-            FileUtils.writeStringToFile(new File(filename),block.toJS());
-
-            //Append include statement
-            String include="include('"+BLOCK_DEFINTION_DIRECTORY+block.getFamily()+File.separator+block.getName()+".js');";
-            FileUtils.writeStringToFile(new File(WORKFLOW_DESIGNER_DIRECTORY +WORKFLOW_BLOCKS_FILE),include,true);
+            //Write JS file description of block to array
+            blocks_array.put(block.toJSON());
         }
+        FileUtils.writeStringToFile(new File( workflow_blocks_file),blocks_array.toString(4));
+        return blocks_array;
     }
 
     /**
@@ -85,13 +74,13 @@ public class Workflow {
      * If not intialized, it searches for all classes with @BlockType annotations and gets the type and family
      * @return
      */
-    public static ArrayList<Block> getBlockDefinitions(){
+    public  ArrayList<Block> getBlockDefinitions(){
         if(block_definitions!=null) return block_definitions;
         else block_definitions = new ArrayList<>();
-        Set<Class<?>> block_types = new Reflections(PACKAGE).getTypesAnnotatedWith(BlockType.class);
+        Set<Class<?>> block_types = new Reflections(this.package_name).getTypesAnnotatedWith(BlockType.class);
         for(Class block_type:block_types){
             try {
-                Block block= new Block(block_type.newInstance());
+                Block block= new Block(block_type.newInstance(),this);
                 assert block!=null;
                 Annotation annotation = block_type.getAnnotation(BlockType.class);
                 Class<? extends Annotation> type = annotation.annotationType();
@@ -116,7 +105,7 @@ public class Workflow {
      * @param name
      * @return
      */
-    public static Block getDefinition(String name){
+    public Block getDefinition(String name){
         for(Block block:getBlockDefinitions()){
             if(block.getName().equals(name)){
                 return block;
@@ -131,7 +120,7 @@ public class Workflow {
      * @param blocks_array
      * @return
      */
-    public static HashMap<Integer, Block> indexBlocks(JSONArray blocks_array) {
+    public HashMap<Integer, Block> indexBlocks(JSONArray blocks_array) {
         HashMap<Integer,Block> blocks=new HashMap<>();
         for(int i=0; i<blocks_array.length(); i++){
 
@@ -139,7 +128,7 @@ public class Workflow {
             Block block = null;
 
             //get Block object by type of block in JSON
-            Set<Class<?>> block_types = new Reflections(PACKAGE).getTypesAnnotatedWith(BlockType.class);
+            Set<Class<?>> block_types = new Reflections(this.package_name).getTypesAnnotatedWith(BlockType.class);
             for(Class block_type:block_types){
                 Annotation annotation = block_type.getAnnotation(BlockType.class);
                 Class<? extends Annotation> type = annotation.annotationType();
@@ -151,7 +140,7 @@ public class Workflow {
                 }
                 if (block_object.getString("type").equals(block_type_name)){
                     try {
-                        block = new Block(block_type.newInstance());
+                        block = new Block(block_type.newInstance(),this);
                         break;
                     } catch (InstantiationException | IllegalAccessException e) {
                         e.printStackTrace();
@@ -179,7 +168,7 @@ public class Workflow {
      * @param blocks
      * @return
      */
-    public static ArrayList<Integer> populateWaitList(JSONArray edges_array, HashMap<Integer,Block>blocks){
+    public ArrayList<Integer> populateWaitList(JSONArray edges_array, HashMap<Integer,Block>blocks){
         ArrayList<Integer>wait=new ArrayList<>();
         for(int i=0;i<edges_array.length();i++) {
             JSONObject edge_object = edges_array.getJSONObject(i);
@@ -210,7 +199,7 @@ public class Workflow {
      * @param jObject
      * @throws Exception
      */
-    public static void execute(JSONObject jObject) throws Exception{
+    public void execute(JSONObject jObject) throws Exception{
         JSONArray blocks_array = jObject.getJSONArray("blocks");
 
         //Accumulate and index all blocks defined in the workflow
@@ -279,7 +268,7 @@ public class Workflow {
      * @param source_param
      * @param source_block
      */
-    private static void populateDependencies(int block1_id, Block block1, JSONObject edge_object, HashMap<Integer,Block> dependencies, HashMap<String,String> source_param, HashMap<String,Integer> source_block) {
+    private void populateDependencies(int block1_id, Block block1, JSONObject edge_object, HashMap<Integer,Block> dependencies, HashMap<String,String> source_param, HashMap<String,Integer> source_block) {
         JSONArray connector1 = edge_object.getJSONArray("connector1");
         JSONArray connector2 = edge_object.getJSONArray("connector2");
 

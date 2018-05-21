@@ -40,6 +40,7 @@ import java.util.HashMap;
 
 
 public class Block {
+    private Workflow workflow;
     private String name;
     private String family;
     private HashMap<String, Data> input;
@@ -58,18 +59,10 @@ public class Block {
     //Temporary variables
     private boolean processed=false;
 
-    public Block(String name, String family, HashMap<String, Data> input, HashMap<String, Data> output, HashMap<String,Property> properties) {
-        this.name = name;
-        this.family = family;
-        this.properties = properties;
-        this.input = input;
-        this.output = output;
-    }
-
     public void fromJSON(JSONObject blockObject){
         this.name = blockObject.getString("type");
 
-        Block block = Workflow.getDefinition(this.name);
+        Block block = workflow.getDefinition(this.name);
 
         if(block==null)return;
         this.family = block.getFamily();
@@ -106,8 +99,9 @@ public class Block {
 
     }
 
-    public Block(Object context){
-        this.context=context;
+    public Block(Object context, Workflow workflow){
+        this.context = context;
+        this.workflow = workflow;
     }
 
 
@@ -128,7 +122,7 @@ public class Block {
     }
 
     public String toJS() {
-        return "blocks.register("+ this.toJSON().toString()+");";
+        return "blocks.register("+ this.toJSON().toString(4)+");";
     }
 
     public JSONObject toJSON(){

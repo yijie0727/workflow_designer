@@ -38,15 +38,15 @@ public class WorkflowDesignerTest {
 
     @Test
     public void testBlock() throws IOException {
-        Workflow.initializeBlocks("workflow_designer/","test");
+        new Workflow("test").initializeBlocks("workflow_designer/workflow_blocks.json");
     }
 
     @Test
     public void testJSON() throws Exception {
-        Workflow.PACKAGE="test";
+
         String json = FileUtils.readFileToString(new File("workflow_designer/test.json"),Charset.defaultCharset());
         JSONObject jsonObject = new JSONObject(json);
-        Workflow.execute(jsonObject);
+        new Workflow("test").execute(jsonObject);
         assert  ArithmeticBlock.getOp3()==15;
     }
 

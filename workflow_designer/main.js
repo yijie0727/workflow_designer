@@ -1,11 +1,8 @@
 (function(){
-    function include(file) {
-        $('head').append('<script type="text/javascript" src="'+file+'"></script>');
-    }
+
     
     blocks = new Blocks();
-    include('workflow_blocks.js');
-    include('scene.js');
+
     blocks.types.addCompatibility('string', 'number');
     blocks.types.addCompatibility('string', 'bool');
     blocks.types.addCompatibility('bool', 'number');
@@ -13,26 +10,25 @@
     blocks.types.addCompatibility('bool', 'string');
 
     blocks.run('#blocks');
-    blocks.load(scene);
+    blocks.load({"blocks":[],"edges":[]});
+
+    function saveToFile(text) {
+        var pom = document.createElement('a');
+        pom.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
+        pom.setAttribute('download', "export.json");
+
+        if (document.createEvent) {
+            var event = document.createEvent('MouseEvents');
+            event.initEvent('click', true, true);
+            pom.dispatchEvent(event);
+        }
+        else {
+            pom.click();
+        }
+    }
 
     blocks.ready(function() {
 	blocks.menu.addAction('Export', function(blocks) {
-
-        function saveToFile(text) {
-                var pom = document.createElement('a');
-                pom.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
-                pom.setAttribute('download', "export.json");
-
-                if (document.createEvent) {
-                    var event = document.createEvent('MouseEvents');
-                    event.initEvent('click', true, true);
-                    pom.dispatchEvent(event);
-                }
-                else {
-                    pom.click();
-                }
-        }
-
         saveToFile(JSON.stringify(blocks.export(),null,4));
 	}, 'export');
 
@@ -67,12 +63,56 @@
             blocks.redraw();
         });
 
-        $('.stressTest').click(function() {
-            for (var x=0; x<1000; x+=100) {
-                for (var y=0; y<1000; y+=100) {
-                    blocks.addBlock('Sinus', x, y);
+        $('.loadBlocks').click(function() {
+
+                var file=document.createElement("input");
+                file.setAttribute("type","file");
+                $(file).change(
+                    function (e) {
+                        var fr = new FileReader();
+                        fr.onload=function(e){
+                            blocks.register(JSON.parse(e.target.result));
+                        }
+                        fr.readAsText(e. target. files[0]);
+                    }
+                );
+
+                if (document.createEvent) {
+                  var event = document.createEvent('MouseEvents');
+                  event.initEvent('click', true, true);
+                  file.dispatchEvent(event);
                 }
+                else {
+                  file.click();
+                }
+        });
+        $('.open').click(function() {
+
+            var file=document.createElement("input");
+            file.setAttribute("type","file");
+            $(file).change(
+                function (e) {
+                    var fr = new FileReader();
+                    fr.onload=function(e){
+                        blocks.load(JSON.parse(e.target.result));
+                    }
+                    fr.readAsText(e. target. files[0]);
+                }
+            );
+
+            if (document.createEvent) {
+                var event = document.createEvent('MouseEvents');
+                event.initEvent('click', true, true);
+                file.dispatchEvent(event);
+            }
+            else {
+                file.click();
             }
         });
+
+        $('.save').click(function () {
+            saveToFile(JSON.stringify(blocks.export(),null,4));
+        });
+
     });
 })();
