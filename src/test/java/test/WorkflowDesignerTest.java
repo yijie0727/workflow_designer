@@ -1,4 +1,5 @@
 package test;
+import cz.zcu.kiv.WorkflowDesigner.FieldMismatchException;
 import cz.zcu.kiv.WorkflowDesigner.Workflow;
 import org.apache.commons.io.FileUtils;
 import org.json.JSONArray;
@@ -45,7 +46,7 @@ public class WorkflowDesignerTest {
     }
 
     @Test
-    public void testJSON() throws IOException, NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException {
+    public void testJSON() throws IOException, NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException, FieldMismatchException {
 
         String json = FileUtils.readFileToString(new File("workflow_designer/test.json"),Charset.defaultCharset());
         JSONObject jsonObject = new JSONObject(json);
