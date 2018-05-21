@@ -29,7 +29,7 @@ public class Type {
 
     public static final String STRING = "STRING";
 
-    public static final String ARRAY = "ARRAY";
+    public static final String STRING_ARRAY = "STRING[]";
 
-    public static final String OBJECT = "OBJECT";
+    public static final String NUMBER_ARRAY = "NUMBER[]";
 }

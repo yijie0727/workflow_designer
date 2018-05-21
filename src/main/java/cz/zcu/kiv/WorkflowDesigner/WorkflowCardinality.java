@@ -22,7 +22,7 @@ package cz.zcu.kiv.WorkflowDesigner;
  *
  * WorkflowCardinality, 2018/17/05 6:32 Joey Pinto
  *
- * This class declares constants to be used as acceptable cardinalities for each I/O field.
+ * This class declares constants to be used as acceptable cardinality for each I/O field.
  **********************************************************************************************************************/
 public class WorkflowCardinality {
     public static final String ONE_TO_ONE="1-1";

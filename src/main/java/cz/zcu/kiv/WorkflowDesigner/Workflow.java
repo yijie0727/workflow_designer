@@ -10,9 +10,8 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationTargetException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Set;
+import java.nio.charset.Charset;
+import java.util.*;
 
 /***********************************************************************************************************************
  *
@@ -44,7 +43,7 @@ public class Workflow {
     private String package_name;
 
 
-    private static ArrayList<Block> block_definitions = null;
+    private List<Block> block_definitions = null;
 
     public Workflow(String package_name){
         this.package_name = package_name;
@@ -56,14 +55,13 @@ public class Workflow {
      * This method intializes a directory made up of javascript files with all annotated blocktypes
      * @throws IOException - Exception if there is a problem creating directories
      */
-    public  JSONArray initializeBlocks(String workflow_blocks_file) throws IOException {
+    public  JSONArray initializeBlocks() throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
         JSONArray blocks_array=new JSONArray();
 
         for(Block block:getBlockDefinitions()){
             //Write JS file description of block to array
             blocks_array.put(block.toJSON());
         }
-        FileUtils.writeStringToFile(new File( workflow_blocks_file),blocks_array.toString(4));
         return blocks_array;
     }
 
@@ -72,16 +70,14 @@ public class Workflow {
      * This method creates a singleton access to block_defintions
      *
      * If not intialized, it searches for all classes with @BlockType annotations and gets the type and family
-     * @return
+     * @return List of Block objects
      */
-    public  ArrayList<Block> getBlockDefinitions(){
+    public  List<Block> getBlockDefinitions() throws IllegalAccessException, InstantiationException, NoSuchMethodException, InvocationTargetException {
         if(block_definitions!=null) return block_definitions;
         else block_definitions = new ArrayList<>();
         Set<Class<?>> block_types = new Reflections(this.package_name).getTypesAnnotatedWith(BlockType.class);
         for(Class block_type:block_types){
-            try {
                 Block block= new Block(block_type.newInstance(),this);
-                assert block!=null;
                 Annotation annotation = block_type.getAnnotation(BlockType.class);
                 Class<? extends Annotation> type = annotation.annotationType();
                 String block_type_name=(String)type.getDeclaredMethod("type").invoke(annotation, (Object[])null);
@@ -91,9 +87,6 @@ public class Workflow {
                 block.initialize();
                 block_definitions.add(block);
 
-            } catch (InstantiationException | IllegalAccessException | NoSuchMethodException | InvocationTargetException e) {
-                e.printStackTrace();
-            }
         }
         return block_definitions;
     }
@@ -101,11 +94,11 @@ public class Workflow {
     /**
      * getDefinition - Joey Pinto
      *
-     * get the defintion of a block with it's type name
+     * get the definition of a block with it's type name
      * @param name
-     * @return
+     * @return Block attributes
      */
-    public Block getDefinition(String name){
+    public Block getDefinition(String name) throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
         for(Block block:getBlockDefinitions()){
             if(block.getName().equals(name)){
                 return block;
@@ -116,12 +109,12 @@ public class Workflow {
 
     /**
      * indexBlocks - Joey Pinto
-     * Index Blocks from JSONArray to HashMap
+     * Index Blocks from JSONArray to Map
      * @param blocks_array
-     * @return
+     * @return  Map of blocks indexed with block ids
      */
-    public HashMap<Integer, Block> indexBlocks(JSONArray blocks_array) {
-        HashMap<Integer,Block> blocks=new HashMap<>();
+    public Map<Integer, Block> indexBlocks(JSONArray blocks_array) throws IllegalAccessException, NoSuchMethodException, InvocationTargetException, InstantiationException, FieldMismatchException {
+        Map<Integer,Block> blocks=new HashMap<>();
         for(int i=0; i<blocks_array.length(); i++){
 
             JSONObject block_object=blocks_array.getJSONObject(i);
@@ -133,20 +126,13 @@ public class Workflow {
                 Annotation annotation = block_type.getAnnotation(BlockType.class);
                 Class<? extends Annotation> type = annotation.annotationType();
                 String block_type_name= null;
-                try {
                     block_type_name = (String)type.getDeclaredMethod("type").invoke(annotation, (Object[])null);
-                } catch (IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
-                    e.printStackTrace();
-                }
                 if (block_object.getString("type").equals(block_type_name)){
-                    try {
                         block = new Block(block_type.newInstance(),this);
                         break;
-                    } catch (InstantiationException | IllegalAccessException e) {
-                        e.printStackTrace();
-                    }
                 }
             }
+            if(block==null) throw new FieldMismatchException(block_object.getString("type"),"block type");
             //Initialize the block I/O and configurations
             block.initialize();
 
@@ -168,7 +154,7 @@ public class Workflow {
      * @param blocks
      * @return
      */
-    public ArrayList<Integer> populateWaitList(JSONArray edges_array, HashMap<Integer,Block>blocks){
+    public ArrayList<Integer> populateWaitList(JSONArray edges_array, Map<Integer,Block>blocks){
         ArrayList<Integer>wait=new ArrayList<>();
         for(int i=0;i<edges_array.length();i++) {
             JSONObject edge_object = edges_array.getJSONObject(i);
@@ -199,18 +185,18 @@ public class Workflow {
      * @param jObject
      * @throws Exception
      */
-    public void execute(JSONObject jObject) throws Exception{
+    public void execute(JSONObject jObject) throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException, FieldMismatchException {
         JSONArray blocks_array = jObject.getJSONArray("blocks");
 
         //Accumulate and index all blocks defined in the workflow
-        HashMap<Integer,Block> blocks=indexBlocks(blocks_array);
+        Map<Integer,Block> blocks=indexBlocks(blocks_array);
 
         JSONArray edges_array = jObject.getJSONArray("edges");
 
         Block wait_block;
         while(true){
             //Populate wait list
-            ArrayList<Integer>wait= populateWaitList(edges_array,blocks);
+            List<Integer>wait= populateWaitList(edges_array,blocks);
 
             //Wait queue is empty, exit
             if(wait.size()==0)break;
@@ -221,9 +207,9 @@ public class Workflow {
                 int wait_block_id = aWait;
                 wait_block = blocks.get(wait_block_id);
 
-                HashMap<Integer, Block> dependencies = new HashMap<>();
-                HashMap<String, String> source_param = new HashMap<>();
-                HashMap<String, Integer> source_block = new HashMap<>();
+                Map<Integer, Block> dependencies = new HashMap<>();
+                Map<String, String> source_param = new HashMap<>();
+                Map<String, Integer> source_block = new HashMap<>();
 
                 
                 //Check dependencies of waiting block
@@ -268,7 +254,7 @@ public class Workflow {
      * @param source_param
      * @param source_block
      */
-    private void populateDependencies(int block1_id, Block block1, JSONObject edge_object, HashMap<Integer,Block> dependencies, HashMap<String,String> source_param, HashMap<String,Integer> source_block) {
+    private void populateDependencies(int block1_id, Block block1, JSONObject edge_object, Map<Integer,Block> dependencies, Map<String,String> source_param, Map<String,Integer> source_block) {
         JSONArray connector1 = edge_object.getJSONArray("connector1");
         JSONArray connector2 = edge_object.getJSONArray("connector2");
 

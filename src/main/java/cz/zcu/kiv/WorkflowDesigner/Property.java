@@ -24,7 +24,7 @@ package cz.zcu.kiv.WorkflowDesigner;
  *
  * Property, 2018/16/05 13:32 Joey
  *
- * This file is a model for the preoperties of the blocks in the workflow designer tool
+ * This file is a model for the properties of the blocks in the workflow designer tool
  **********************************************************************************************************************/
 public class Property {
     private String name;

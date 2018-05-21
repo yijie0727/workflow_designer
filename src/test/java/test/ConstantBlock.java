@@ -3,7 +3,6 @@ package test;
 import cz.zcu.kiv.WorkflowDesigner.Annotations.*;
 
 import static cz.zcu.kiv.WorkflowDesigner.Type.NUMBER;
-import static cz.zcu.kiv.WorkflowDesigner.Type.STRING;
 import static cz.zcu.kiv.WorkflowDesigner.WorkflowCardinality.ONE_TO_ONE;
 
 @BlockType(type ="CONSTANT", family = "MATH")

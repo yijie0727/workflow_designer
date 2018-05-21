@@ -1,11 +1,13 @@
 package test;
 import cz.zcu.kiv.WorkflowDesigner.Workflow;
 import org.apache.commons.io.FileUtils;
+import org.json.JSONArray;
 import org.json.JSONObject;
 import org.junit.Test;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
 import java.nio.charset.Charset;
 
 
@@ -37,12 +39,13 @@ import java.nio.charset.Charset;
 public class WorkflowDesignerTest {
 
     @Test
-    public void testBlock() throws IOException {
-        new Workflow("test").initializeBlocks("workflow_designer/workflow_blocks.json");
+    public void testBlock() throws IOException, NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException {
+        JSONArray blocks_array=new Workflow("test").initializeBlocks();
+        FileUtils.writeStringToFile(new File("workflow_designer/workflow_blocks.json"),blocks_array.toString(4),Charset.defaultCharset());
     }
 
     @Test
-    public void testJSON() throws Exception {
+    public void testJSON() throws IOException, NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException {
 
         String json = FileUtils.readFileToString(new File("workflow_designer/test.json"),Charset.defaultCharset());
         JSONObject jsonObject = new JSONObject(json);

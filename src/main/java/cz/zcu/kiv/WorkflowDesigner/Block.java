@@ -11,6 +11,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.HashMap;
+import java.util.Map;
 
 /***********************************************************************************************************************
  *
@@ -35,7 +36,7 @@ import java.util.HashMap;
  *
  * Block, 2018/16/05 13:32 Joey Pinto
  *
- * This file is the model for a single block in the worklow designer tool
+ * This file is the model for a single block in the workflow designer tool
  **********************************************************************************************************************/
 
 
@@ -43,9 +44,9 @@ public class Block {
     private Workflow workflow;
     private String name;
     private String family;
-    private HashMap<String, Data> input;
-    private HashMap<String, Data> output;
-    private HashMap<String,Property> properties;
+    private Map<String, Data> input;
+    private Map<String, Data> output;
+    private Map<String,Property> properties;
     private Object context;
 
     public Object getContext() {
@@ -59,7 +60,7 @@ public class Block {
     //Temporary variables
     private boolean processed=false;
 
-    public void fromJSON(JSONObject blockObject){
+    public void fromJSON(JSONObject blockObject) throws NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException {
         this.name = blockObject.getString("type");
 
         Block block = workflow.getDefinition(this.name);
@@ -77,7 +78,6 @@ public class Block {
                     f.setAccessible(true);
                     BlockProperty blockProperty = f.getAnnotation(BlockProperty.class);
                     if (blockProperty != null) {
-                        try {
                             if(blockProperty.name().equals(key)){
                                 properties.put(blockProperty.name(), new Property(blockProperty.name(), blockProperty.type(), blockProperty.defaultValue()));
                                 if(f.getType().equals(int.class))
@@ -88,9 +88,6 @@ public class Block {
                                 else f.set(context, f.getType().cast(values.getString(key.toLowerCase())));
                                 break;
                             }
-                        } catch (IllegalAccessException e) {
-                            e.printStackTrace();
-                        }
                     }
                 }
             }
@@ -168,13 +165,13 @@ public class Block {
         return blockjs;
     }
 
-    public void processBlock(HashMap<Integer, Block> blocks, HashMap<String, Integer> source_blocks, HashMap<String, String> source_params){
+    public void processBlock(Map<Integer, Block> blocks, Map<String, Integer> source_blocks, Map<String, String> source_params) throws IllegalAccessException, FieldMismatchException {
         if(getInput()!=null&&getInput().size()>0) {
             for (String key : getInput().keySet()) {
                 Data destination_data=getInput().get(key);
                 Block source_block = blocks.get(source_blocks.get(key.toLowerCase()));
 
-                HashMap<String, Data> source = source_block.getOutput();
+                Map<String, Data> source = source_block.getOutput();
                 Data source_data=null;
                 for(String source_key:source_params.keySet()){
                     if(source_key.equals(key.toLowerCase())){
@@ -184,19 +181,17 @@ public class Block {
                 }
                 Object value = null;
 
+                if(source_data==null) throw new FieldMismatchException(key,"input");
+
                 for (Field f: source_block.getContext().getClass().getDeclaredFields()) {
                     f.setAccessible(true);
 
                     BlockOutput blockOutput = f.getAnnotation(BlockOutput.class);
                     if (blockOutput != null){
-                        try {
                             if(blockOutput.name().equals(source_data.getName())) {
                                 value = f.get(source_block.getContext());
                                 break;
                             }
-                        } catch ( IllegalAccessException e) {
-                            e.printStackTrace();
-                        }
                     }
                 }
 
@@ -205,15 +200,10 @@ public class Block {
 
                     BlockInput blockInput = f.getAnnotation(BlockInput.class);
                     if (blockInput != null) {
-                        try {
                             if(blockInput.name().equals(destination_data.getName())){
                                 f.set(context,value);
                                 break;
                             }
-
-                        } catch (IllegalAccessException e) {
-                            e.printStackTrace();
-                        }
                     }
                 }
 
@@ -238,27 +228,27 @@ public class Block {
         }
     }
 
-    public HashMap<String, Property> getProperties() {
+    public Map<String, Property> getProperties() {
         return properties;
     }
 
-    public void setProperties(HashMap<String, Property> properties) {
+    public void setProperties(Map<String, Property> properties) {
         this.properties = properties;
     }
 
-    public HashMap<String, Data> getInput() {
+    public Map<String, Data> getInput() {
         return input;
     }
 
-    public void setInput(HashMap<String, Data> input) {
+    public void setInput(Map<String, Data> input) {
         this.input = input;
     }
 
-    public HashMap<String, Data> getOutput() {
+    public Map<String, Data> getOutput() {
         return output;
     }
 
-    public void setOutput(HashMap<String, Data> output) {
+    public void setOutput(Map<String, Data> output) {
         this.output = output;
     }
 
