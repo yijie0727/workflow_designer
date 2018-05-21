@@ -42,13 +42,13 @@ public class WorkflowDesignerTest {
     @Test
     public void testBlock() throws IOException, NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException {
         JSONArray blocks_array=new Workflow("test").initializeBlocks();
-        FileUtils.writeStringToFile(new File("workflow_designer/workflow_blocks.json"),blocks_array.toString(4),Charset.defaultCharset());
+        FileUtils.writeStringToFile(new File("src/main/webapp/workflow_blocks.json"),blocks_array.toString(4),Charset.defaultCharset());
     }
 
     @Test
     public void testJSON() throws IOException, NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException, FieldMismatchException {
 
-        String json = FileUtils.readFileToString(new File("workflow_designer/test.json"),Charset.defaultCharset());
+        String json = FileUtils.readFileToString(new File("src/main/webapp/test.json"),Charset.defaultCharset());
         JSONObject jsonObject = new JSONObject(json);
         new Workflow("test").execute(jsonObject);
         assert  ArithmeticBlock.getOp3()==15;
