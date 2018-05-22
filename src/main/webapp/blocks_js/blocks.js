@@ -48,7 +48,7 @@ var Field = function(metaField)
     if (metaField.type == undefined) {
         this.type = 'string';
     } else {
-        var type = metaField.type.toLowerCase();
+        var type = metaField.type;
         type = Types.normalize(type);
 
         this.type = type;
@@ -65,7 +65,7 @@ var Field = function(metaField)
     this.hideLabel = 'hideLabel' in metaField && metaField.hideLabel;
 
     // Field iname
-    this.name = metaField.name.toLowerCase();
+    this.name = metaField.name;
 
     this.label = 'label' in metaField ? metaField.label
         : metaField.name;
@@ -398,8 +398,6 @@ var Fields = function(block)
  */
 Fields.prototype.getField = function(name)
 {
-    name = name.toLowerCase();
-
     return (name in this.indexedFields ? this.indexedFields[name] : null);
 };
 
@@ -632,7 +630,7 @@ var Types = function()
  */
 Types.normalize = function(type)
 {
-    type = type.toLowerCase();
+    type = type;
 
     if (type == 'check' || type == 'bool' || type == 'checkbox') {
         type = 'bool';
@@ -1582,7 +1580,7 @@ Block.prototype.getHtml = function()
             }
 
             for (var x=0; x<size; x++) {
-                var connectorId = field.name.toLowerCase() + '_' + key;
+                var connectorId = field.name + '_' + key;
                 var label = field.getLabel().replace('#', x+1);
 
                 var value = '';

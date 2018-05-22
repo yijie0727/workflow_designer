@@ -73,7 +73,7 @@ public class Block {
 
         JSONObject values = blockObject.getJSONObject("values");
         for(String key:this.properties.keySet()){
-            if(values.has(key.toLowerCase())){
+            if(values.has(key)){
                 for (Field f: context.getClass().getDeclaredFields()) {
                     f.setAccessible(true);
                     BlockProperty blockProperty = f.getAnnotation(BlockProperty.class);
@@ -81,11 +81,11 @@ public class Block {
                             if(blockProperty.name().equals(key)){
                                 properties.put(blockProperty.name(), new Property(blockProperty.name(), blockProperty.type(), blockProperty.defaultValue()));
                                 if(f.getType().equals(int.class))
-                                    f.set(context,(int) Double.parseDouble(values.getString(key.toLowerCase())));
+                                    f.set(context,(int) Double.parseDouble(values.getString(key)));
                                 else if(f.getType().equals(double.class))
-                                f.set(context,Double.parseDouble(values.getString(key.toLowerCase())));
+                                f.set(context,Double.parseDouble(values.getString(key)));
 
-                                else f.set(context, f.getType().cast(values.getString(key.toLowerCase())));
+                                else f.set(context, f.getType().cast(values.getString(key)));
                                 break;
                             }
                     }
@@ -169,19 +169,22 @@ public class Block {
         if(getInput()!=null&&getInput().size()>0) {
             for (String key : getInput().keySet()) {
                 Data destination_data=getInput().get(key);
-                Block source_block = blocks.get(source_blocks.get(key.toLowerCase()));
+                Block source_block = blocks.get(source_blocks.get(key));
+
+                if(source_block==null) throw new FieldMismatchException(key,"source");
 
                 Map<String, Data> source = source_block.getOutput();
                 Data source_data=null;
-                for(String source_key:source_params.keySet()){
-                    if(source_key.equals(key.toLowerCase())){
+
+                if(source_params.containsKey(key)){
                         source_data=source.get(source_params.get(key));
-                        break;
-                    }
                 }
+
                 Object value = null;
 
-                if(source_data==null) throw new FieldMismatchException(key,"input");
+                if(source_data==null) {
+                    throw new FieldMismatchException(key,"source");
+                }
 
                 for (Field f: source_block.getContext().getClass().getDeclaredFields()) {
                     f.setAccessible(true);

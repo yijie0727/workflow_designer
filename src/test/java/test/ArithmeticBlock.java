@@ -9,16 +9,16 @@ import static cz.zcu.kiv.WorkflowDesigner.WorkflowCardinality.ONE_TO_ONE;
 @BlockType(type ="ARITHMETIC", family = "MATH")
 public class ArithmeticBlock {
 
-    @BlockInput(name = "operand1", type = NUMBER, cardinality = ONE_TO_ONE)
+    @BlockInput(name = "Operand1", type = NUMBER, cardinality = ONE_TO_ONE)
     private int op1=0;
 
-    @BlockInput(name = "operand2", type = NUMBER, cardinality = ONE_TO_ONE)
+    @BlockInput(name = "Operand2", type = NUMBER, cardinality = ONE_TO_ONE)
     private int op2=0;
 
-    @BlockOutput(name = "operand3", type = NUMBER, cardinality = ONE_TO_MANY)
+    @BlockOutput(name = "Operand3", type = NUMBER, cardinality = ONE_TO_MANY)
     private static int op3=0;
 
-    @BlockProperty(name ="operation", type = STRING ,defaultValue = "add")
+    @BlockProperty(name ="Operation", type = STRING ,defaultValue = "add")
     private String operation;
 
     @BlockExecute

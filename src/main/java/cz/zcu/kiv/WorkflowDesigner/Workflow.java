@@ -125,8 +125,7 @@ public class Workflow {
             for(Class block_type:block_types){
                 Annotation annotation = block_type.getAnnotation(BlockType.class);
                 Class<? extends Annotation> type = annotation.annotationType();
-                String block_type_name= null;
-                    block_type_name = (String)type.getDeclaredMethod("type").invoke(annotation, (Object[])null);
+                String block_type_name = (String)type.getDeclaredMethod("type").invoke(annotation, (Object[])null);
                 if (block_object.getString("type").equals(block_type_name)){
                         block = new Block(block_type.newInstance(),this);
                         break;
