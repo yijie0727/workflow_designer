@@ -54,7 +54,5 @@ public class WorkflowDesignerTest {
         assert  ArithmeticBlock.getOp3()==15;
     }
 
-
-
 }
 

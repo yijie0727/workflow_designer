@@ -10,6 +10,7 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationTargetException;
+import java.net.URLClassLoader;
 import java.nio.charset.Charset;
 import java.util.*;
 
@@ -41,12 +42,18 @@ import java.util.*;
 public class Workflow {
 
     private String package_name;
+    private ClassLoader classLoader;
 
 
     private List<Block> block_definitions = null;
 
     public Workflow(String package_name){
         this.package_name = package_name;
+    }
+    public Workflow(String package_name,ClassLoader classLoader){
+
+        this.package_name = package_name;
+        this.classLoader = classLoader;
     }
 
     /**
@@ -57,8 +64,10 @@ public class Workflow {
      */
     public  JSONArray initializeBlocks() throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
         JSONArray blocks_array=new JSONArray();
-
+        System.out.println(this.package_name);
         for(Block block:getBlockDefinitions()){
+            System.out.println("in block "+block.getName());
+
             //Write JS file description of block to array
             blocks_array.put(block.toJSON());
         }
@@ -75,7 +84,15 @@ public class Workflow {
     public  List<Block> getBlockDefinitions() throws IllegalAccessException, InstantiationException, NoSuchMethodException, InvocationTargetException {
         if(block_definitions!=null) return block_definitions;
         else block_definitions = new ArrayList<>();
-        Set<Class<?>> block_types = new Reflections(this.package_name).getTypesAnnotatedWith(BlockType.class);
+
+        Set<Class<?>> block_types;
+        if(classLoader == null){
+            block_types = new Reflections(this.package_name).getTypesAnnotatedWith(BlockType.class);
+        }
+        else{
+            block_types = new Reflections(this.package_name,classLoader).getTypesAnnotatedWith(BlockType.class);
+        }
+        System.out.println(block_types.size());
         for(Class block_type:block_types){
                 Block block= new Block(block_type.newInstance(),this);
                 Annotation annotation = block_type.getAnnotation(BlockType.class);
