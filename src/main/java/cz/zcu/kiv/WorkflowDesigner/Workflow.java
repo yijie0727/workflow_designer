@@ -1,17 +1,13 @@
 package cz.zcu.kiv.WorkflowDesigner;
 
 import cz.zcu.kiv.WorkflowDesigner.Annotations.BlockType;
-import org.apache.commons.io.FileUtils;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.reflections.Reflections;
 
-import java.io.File;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationTargetException;
-import java.net.URLClassLoader;
-import java.nio.charset.Charset;
 import java.util.*;
 
 /***********************************************************************************************************************
@@ -41,18 +37,18 @@ import java.util.*;
  **********************************************************************************************************************/
 public class Workflow {
 
-    private String package_name;
+    private String packageName;
     private ClassLoader classLoader;
 
 
-    private List<Block> block_definitions = null;
+    private List<Block> blockDefinitions = null;
 
-    public Workflow(String package_name){
-        this.package_name = package_name;
+    public Workflow(String packageName){
+        this.packageName = packageName;
     }
-    public Workflow(String package_name,ClassLoader classLoader){
+    public Workflow(String packageName,ClassLoader classLoader){
 
-        this.package_name = package_name;
+        this.packageName = packageName;
         this.classLoader = classLoader;
     }
 
@@ -63,49 +59,45 @@ public class Workflow {
      * @throws IOException - Exception if there is a problem creating directories
      */
     public  JSONArray initializeBlocks() throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
-        JSONArray blocks_array=new JSONArray();
-        System.out.println(this.package_name);
+        JSONArray blocksArray=new JSONArray();
         for(Block block:getBlockDefinitions()){
-            System.out.println("in block "+block.getName());
-
             //Write JS file description of block to array
-            blocks_array.put(block.toJSON());
+            blocksArray.put(block.toJSON());
         }
-        return blocks_array;
+        return blocksArray;
     }
 
     /**
      * getBlockDefinitions - Joey Pinto
-     * This method creates a singleton access to block_defintions
+     * This method creates a singleton access to block definitions
      *
      * If not intialized, it searches for all classes with @BlockType annotations and gets the type and family
      * @return List of Block objects
      */
     public  List<Block> getBlockDefinitions() throws IllegalAccessException, InstantiationException, NoSuchMethodException, InvocationTargetException {
-        if(block_definitions!=null) return block_definitions;
-        else block_definitions = new ArrayList<>();
+        if(blockDefinitions !=null) return blockDefinitions;
+        else blockDefinitions = new ArrayList<>();
 
-        Set<Class<?>> block_types;
+        Set<Class<?>> blockTypes;
         if(classLoader == null){
-            block_types = new Reflections(this.package_name).getTypesAnnotatedWith(BlockType.class);
+            blockTypes = new Reflections(this.packageName).getTypesAnnotatedWith(BlockType.class);
         }
         else{
-            block_types = new Reflections(this.package_name,classLoader).getTypesAnnotatedWith(BlockType.class);
+            blockTypes = new Reflections(this.packageName,classLoader).getTypesAnnotatedWith(BlockType.class);
         }
-        System.out.println(block_types.size());
-        for(Class block_type:block_types){
-                Block block= new Block(block_type.newInstance(),this);
-                Annotation annotation = block_type.getAnnotation(BlockType.class);
+        for(Class blockType:blockTypes){
+                Block block= new Block(blockType.newInstance(),this);
+                Annotation annotation = blockType.getAnnotation(BlockType.class);
                 Class<? extends Annotation> type = annotation.annotationType();
-                String block_type_name=(String)type.getDeclaredMethod("type").invoke(annotation, (Object[])null);
-                String block_type_family=(String)type.getDeclaredMethod("family").invoke(annotation, (Object[])null);
-                block.setName(block_type_name);
-                block.setFamily(block_type_family);
+                String blockTypeName=(String)type.getDeclaredMethod("type").invoke(annotation, (Object[])null);
+                String blockTypeFamily=(String)type.getDeclaredMethod("family").invoke(annotation, (Object[])null);
+                block.setName(blockTypeName);
+                block.setFamily(blockTypeFamily);
                 block.initialize();
-                block_definitions.add(block);
+                blockDefinitions.add(block);
 
         }
-        return block_definitions;
+        return blockDefinitions;
     }
 
     /**
@@ -127,36 +119,36 @@ public class Workflow {
     /**
      * indexBlocks - Joey Pinto
      * Index Blocks from JSONArray to Map
-     * @param blocks_array
+     * @param blocksArray
      * @return  Map of blocks indexed with block ids
      */
-    public Map<Integer, Block> indexBlocks(JSONArray blocks_array) throws IllegalAccessException, NoSuchMethodException, InvocationTargetException, InstantiationException, FieldMismatchException {
+    public Map<Integer, Block> indexBlocks(JSONArray blocksArray) throws IllegalAccessException, NoSuchMethodException, InvocationTargetException, InstantiationException, FieldMismatchException {
         Map<Integer,Block> blocks=new HashMap<>();
-        for(int i=0; i<blocks_array.length(); i++){
+        for(int i=0; i<blocksArray.length(); i++){
 
-            JSONObject block_object=blocks_array.getJSONObject(i);
+            JSONObject blockObject=blocksArray.getJSONObject(i);
             Block block = null;
 
             //get Block object by type of block in JSON
-            Set<Class<?>> block_types = new Reflections(this.package_name).getTypesAnnotatedWith(BlockType.class);
-            for(Class block_type:block_types){
-                Annotation annotation = block_type.getAnnotation(BlockType.class);
+            Set<Class<?>> blockTypes = new Reflections(this.packageName).getTypesAnnotatedWith(BlockType.class);
+            for(Class blockType:blockTypes){
+                Annotation annotation = blockType.getAnnotation(BlockType.class);
                 Class<? extends Annotation> type = annotation.annotationType();
-                String block_type_name = (String)type.getDeclaredMethod("type").invoke(annotation, (Object[])null);
-                if (block_object.getString("type").equals(block_type_name)){
-                        block = new Block(block_type.newInstance(),this);
+                String blockTypeName = (String)type.getDeclaredMethod("type").invoke(annotation, (Object[])null);
+                if (blockObject.getString("type").equals(blockTypeName)){
+                        block = new Block(blockType.newInstance(),this);
                         break;
                 }
             }
-            if(block==null) throw new FieldMismatchException(block_object.getString("type"),"block type");
+            if(block==null) throw new FieldMismatchException(blockObject.getString("type"),"block type");
             //Initialize the block I/O and configurations
             block.initialize();
 
-            //Intitalize values from the JSONObject
-            block.fromJSON(block_object);
+            //IntitIalize values from the JSONObject
+            block.fromJSON(blockObject);
 
             //Set reference ID of block
-            blocks.put(block_object.getInt("id"),block);
+            blocks.put(blockObject.getInt("id"),block);
 
         }
         return blocks;
@@ -166,24 +158,24 @@ public class Workflow {
      * populateWaitList - Joey Pinto
      *
      * Populate wait list of blocks that are unprocessed
-     * @param edges_array
+     * @param edgesArray
      * @param blocks
      * @return
      */
-    public ArrayList<Integer> populateWaitList(JSONArray edges_array, Map<Integer,Block>blocks){
+    public ArrayList<Integer> populateWaitList(JSONArray edgesArray, Map<Integer,Block>blocks){
         ArrayList<Integer>wait=new ArrayList<>();
-        for(int i=0;i<edges_array.length();i++) {
-            JSONObject edge_object = edges_array.getJSONObject(i);
-            Block block1 = blocks.get(edge_object.getInt("block1"));
-            Block block2 = blocks.get(edge_object.getInt("block2"));
+        for(int i=0;i<edgesArray.length();i++) {
+            JSONObject edgeObject = edgesArray.getJSONObject(i);
+            Block block1 = blocks.get(edgeObject.getInt("block1"));
+            Block block2 = blocks.get(edgeObject.getInt("block2"));
             if(!block1.isProcessed()){
                 if(block1.getInput()==null||block1.getInput().size()==0){
-                    wait.add(edge_object.getInt("block1"));
+                    wait.add(edgeObject.getInt("block1"));
                 }
             }
             if(!block2.isProcessed()){
                 if (block1.isProcessed() && !block2.isProcessed()) {
-                    wait.add(edge_object.getInt("block2"));
+                    wait.add(edgeObject.getInt("block2"));
                 }
             }
 
@@ -202,17 +194,17 @@ public class Workflow {
      * @throws Exception
      */
     public void execute(JSONObject jObject) throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException, FieldMismatchException {
-        JSONArray blocks_array = jObject.getJSONArray("blocks");
+        JSONArray blocksArray = jObject.getJSONArray("blocks");
 
         //Accumulate and index all blocks defined in the workflow
-        Map<Integer,Block> blocks=indexBlocks(blocks_array);
+        Map<Integer,Block> blocks=indexBlocks(blocksArray);
 
-        JSONArray edges_array = jObject.getJSONArray("edges");
+        JSONArray edgesArray = jObject.getJSONArray("edges");
 
-        Block wait_block;
+        Block waitBlock;
         while(true){
             //Populate wait list
-            List<Integer>wait= populateWaitList(edges_array,blocks);
+            List<Integer>wait= populateWaitList(edgesArray,blocks);
 
             //Wait queue is empty, exit
             if(wait.size()==0)break;
@@ -220,26 +212,26 @@ public class Workflow {
             //Process wait queue
             for (Integer aWait : wait) {
                 boolean ready = true;
-                int wait_block_id = aWait;
-                wait_block = blocks.get(wait_block_id);
+                int waitBlockId = aWait;
+                waitBlock = blocks.get(waitBlockId);
 
                 Map<Integer, Block> dependencies = new HashMap<>();
-                Map<String, String> source_param = new HashMap<>();
-                Map<String, Integer> source_block = new HashMap<>();
+                Map<String, String> sourceParam = new HashMap<>();
+                Map<String, Integer> sourceBlock = new HashMap<>();
 
                 
                 //Check dependencies of waiting block
-                for (int i = 0; i < edges_array.length(); i++) {
-                    JSONObject edge_object = edges_array.getJSONObject(i);
+                for (int i = 0; i < edgesArray.length(); i++) {
+                    JSONObject edgeObject = edgesArray.getJSONObject(i);
 
                     //Choose only edges that end on block 2
-                    if (wait_block_id != edge_object.getInt("block2")) continue;
+                    if (waitBlockId != edgeObject.getInt("block2")) continue;
 
-                    int block1_id = edge_object.getInt("block1");
-                    Block block1 = blocks.get(block1_id);
+                    int block1Id = edgeObject.getInt("block1");
+                    Block block1 = blocks.get(block1Id);
 
                     //Populate the dependencies into the maps
-                    populateDependencies(block1_id,block1,edge_object,dependencies,source_param,source_block);
+                    populateDependencies(block1Id,block1,edgeObject,dependencies,sourceParam,sourceBlock);
 
                     //A dependency is unprocessed so not ready
                     if (!block1.isProcessed()) {
@@ -250,7 +242,7 @@ public class Workflow {
 
                 if (ready) {
                     //Process the ready block
-                    wait_block.processBlock(dependencies, source_block, source_param);
+                    waitBlock.processBlock(dependencies, sourceBlock, sourceParam);
                     break;
                 }
 
@@ -263,23 +255,23 @@ public class Workflow {
      *
      * Populate the dependency maps of a block
      *
-     * @param block1_id
+     * @param block1Id
      * @param block1
-     * @param edge_object
+     * @param edgeObject
      * @param dependencies
-     * @param source_param
-     * @param source_block
+     * @param sourceParam
+     * @param sourceBlock
      */
-    private void populateDependencies(int block1_id, Block block1, JSONObject edge_object, Map<Integer,Block> dependencies, Map<String,String> source_param, Map<String,Integer> source_block) {
-        JSONArray connector1 = edge_object.getJSONArray("connector1");
-        JSONArray connector2 = edge_object.getJSONArray("connector2");
+    private void populateDependencies(int block1Id, Block block1, JSONObject edgeObject, Map<Integer,Block> dependencies, Map<String,String> sourceParam, Map<String,Integer> sourceBlock) {
+        JSONArray connector1 = edgeObject.getJSONArray("connector1");
+        JSONArray connector2 = edgeObject.getJSONArray("connector2");
 
         for (int k = 0; k < connector1.length(); k++) {
-            source_param.put(connector2.getString(k), connector1.getString(k));
-            source_block.put(connector2.getString(k), block1_id);
+            sourceParam.put(connector2.getString(k), connector1.getString(k));
+            sourceBlock.put(connector2.getString(k), block1Id);
         }
 
-        dependencies.put(block1_id, block1);
+        dependencies.put(block1Id, block1);
     }
 
 

@@ -138,26 +138,26 @@ public class Block {
         }
 
         if(input!=null && input.size()!=0) {
-            for(String input_param:input.keySet()) {
-                Data input_value=input.get(input_param);
-                JSONObject input_obj = new JSONObject();
-                input_obj.put("name", input_value.getName());
-                input_obj.put("type", input_value.getType());
-                input_obj.put("attrs", "input");
-                input_obj.put("card", input_value.getCardinality());
-                fields.put(input_obj);
+            for(String inputParam:input.keySet()) {
+                Data inputValue=input.get(inputParam);
+                JSONObject inputObj = new JSONObject();
+                inputObj.put("name", inputValue.getName());
+                inputObj.put("type", inputValue.getType());
+                inputObj.put("attrs", "input");
+                inputObj.put("card", inputValue.getCardinality());
+                fields.put(inputObj);
             }
         }
 
         if(output!=null && output.size()!=0) {
-            for(String output_param:output.keySet()){
-                Data output_value=output.get(output_param);
-                JSONObject output_obj = new JSONObject();
-                output_obj.put("name", output_value.getName());
-                output_obj.put("type", output_value.getType());
-                output_obj.put("attrs", "output");
-                output_obj.put("card", output_value.getCardinality());
-                fields.put(output_obj);
+            for(String outputParam:output.keySet()){
+                Data outputValue=output.get(outputParam);
+                JSONObject outpuObj = new JSONObject();
+                outpuObj.put("name", outputValue.getName());
+                outpuObj.put("type", outputValue.getType());
+                outpuObj.put("attrs", "output");
+                outpuObj.put("card", outputValue.getCardinality());
+                fields.put(outpuObj);
             }
         }
         blockjs.put("fields", fields);
@@ -165,34 +165,34 @@ public class Block {
         return blockjs;
     }
 
-    public void processBlock(Map<Integer, Block> blocks, Map<String, Integer> source_blocks, Map<String, String> source_params) throws IllegalAccessException, FieldMismatchException {
+    public void processBlock(Map<Integer, Block> blocks, Map<String, Integer> sourceBlocks, Map<String, String> sourceParams) throws IllegalAccessException, FieldMismatchException {
         if(getInput()!=null&&getInput().size()>0) {
             for (String key : getInput().keySet()) {
-                Data destination_data=getInput().get(key);
-                Block source_block = blocks.get(source_blocks.get(key));
+                Data destinationData=getInput().get(key);
+                Block sourceBlock = blocks.get(sourceBlocks.get(key));
 
-                if(source_block==null) throw new FieldMismatchException(key,"source");
+                if(sourceBlock==null) throw new FieldMismatchException(key,"source");
 
-                Map<String, Data> source = source_block.getOutput();
-                Data source_data=null;
+                Map<String, Data> source = sourceBlock.getOutput();
+                Data sourceData=null;
 
-                if(source_params.containsKey(key)){
-                        source_data=source.get(source_params.get(key));
+                if(sourceParams.containsKey(key)){
+                        sourceData=source.get(sourceParams.get(key));
                 }
 
                 Object value = null;
 
-                if(source_data==null) {
+                if(sourceData==null) {
                     throw new FieldMismatchException(key,"source");
                 }
 
-                for (Field f: source_block.getContext().getClass().getDeclaredFields()) {
+                for (Field f: sourceBlock.getContext().getClass().getDeclaredFields()) {
                     f.setAccessible(true);
 
                     BlockOutput blockOutput = f.getAnnotation(BlockOutput.class);
                     if (blockOutput != null){
-                            if(blockOutput.name().equals(source_data.getName())) {
-                                value = f.get(source_block.getContext());
+                            if(blockOutput.name().equals(sourceData.getName())) {
+                                value = f.get(sourceBlock.getContext());
                                 break;
                             }
                     }
@@ -203,7 +203,7 @@ public class Block {
 
                     BlockInput blockInput = f.getAnnotation(BlockInput.class);
                     if (blockInput != null) {
-                            if(blockInput.name().equals(destination_data.getName())){
+                            if(blockInput.name().equals(destinationData.getName())){
                                 f.set(context,value);
                                 break;
                             }
