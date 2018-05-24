@@ -22,7 +22,7 @@ public class ArithmeticBlock {
     private String operation;
 
     @BlockExecute
-    public void process(){
+    public String process(){
         switch (operation){
             case "add":
                 op3=op1+op2;
@@ -31,6 +31,7 @@ public class ArithmeticBlock {
                 op3=op1-op2;
                 break;
         }
+        return String.valueOf(op3);
     }
 
     public static int getOp3() {

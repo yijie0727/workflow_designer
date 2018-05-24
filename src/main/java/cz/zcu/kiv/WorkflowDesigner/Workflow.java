@@ -1,13 +1,16 @@
 package cz.zcu.kiv.WorkflowDesigner;
 
 import cz.zcu.kiv.WorkflowDesigner.Annotations.BlockType;
+import org.apache.commons.io.FileUtils;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.reflections.Reflections;
 
+import java.io.File;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationTargetException;
+import java.nio.charset.Charset;
 import java.util.*;
 
 /***********************************************************************************************************************
@@ -130,7 +133,11 @@ public class Workflow {
             Block block = null;
 
             //get Block object by type of block in JSON
-            Set<Class<?>> blockTypes = new Reflections(this.packageName).getTypesAnnotatedWith(BlockType.class);
+            Set<Class<?>> blockTypes;
+            if (this.classLoader == null)
+                blockTypes = new Reflections(this.packageName).getTypesAnnotatedWith(BlockType.class);
+            else
+                blockTypes = new Reflections(this.packageName, this.classLoader).getTypesAnnotatedWith(BlockType.class);
             for(Class blockType:blockTypes){
                 Annotation annotation = blockType.getAnnotation(BlockType.class);
                 Class<? extends Annotation> type = annotation.annotationType();
@@ -193,7 +200,7 @@ public class Workflow {
      * @param jObject
      * @throws Exception
      */
-    public void execute(JSONObject jObject) throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException, FieldMismatchException {
+    public JSONArray execute(JSONObject jObject) throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException, FieldMismatchException {
         JSONArray blocksArray = jObject.getJSONArray("blocks");
 
         //Accumulate and index all blocks defined in the workflow
@@ -242,12 +249,20 @@ public class Workflow {
 
                 if (ready) {
                     //Process the ready block
-                    waitBlock.processBlock(dependencies, sourceBlock, sourceParam);
+                    String output = waitBlock.processBlock(dependencies, sourceBlock, sourceParam);
+                    for(int i=0;i<blocksArray.length();i++){
+                        JSONObject block=blocksArray.getJSONObject(i);
+                        if(block.getInt("id")==waitBlockId){
+                            block.put("output",output);
+                            break;
+                        }
+                    }
                     break;
                 }
 
             }
         }
+        return blocksArray;
     }
 
     /**
@@ -274,5 +289,21 @@ public class Workflow {
         dependencies.put(block1Id, block1);
     }
 
+    /**
+     *
+     * @param args 1)package name  2)Workflow JSON 3)(Optional) Output file location (defaults to output.txt)
+     * @throws FieldMismatchException InputField-OutputField Mismatch
+     * @throws NoSuchMethodException Reflection Problems
+     * @throws InstantiationException
+     * @throws IllegalAccessException
+     * @throws InvocationTargetException
+     * @throws IOException When cannot create file
+     */
+    public static void main(String[] args) throws FieldMismatchException, NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException, IOException {
+        JSONArray jsonArray=new Workflow(args[0]).execute(new JSONObject(args[1]));
+        String outputFile ="output.txt";
+        if(args.length>2) outputFile=args[2];
+        FileUtils.writeStringToFile(new File(outputFile),jsonArray.toString(4),Charset.defaultCharset());
+    }
 
 }
