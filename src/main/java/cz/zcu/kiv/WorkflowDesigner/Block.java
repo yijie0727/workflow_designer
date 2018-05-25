@@ -165,8 +165,8 @@ public class Block {
         return blockjs;
     }
 
-    public String processBlock(Map<Integer, Block> blocks, Map<String, Integer> sourceBlocks, Map<String, String> sourceParams) throws IllegalAccessException, FieldMismatchException {
-        String output="";
+    public Object processBlock(Map<Integer, Block> blocks, Map<String, Integer> sourceBlocks, Map<String, String> sourceParams) throws IllegalAccessException, FieldMismatchException {
+        Object output;
         if(getInput()!=null&&getInput().size()>0) {
             for (String key : getInput().keySet()) {
                 Data destinationData=getInput().get(key);
@@ -220,13 +220,13 @@ public class Block {
         return output;
     }
 
-    public String process(){
-        String output = "";
+    public Object process(){
+        Object output = null;
         for(Method method:context.getClass().getDeclaredMethods()){
             method.setAccessible(true);
             if(method.getAnnotation(BlockExecute.class)!=null){
                 try {
-                    output = (String) method.invoke(context);
+                    output =  method.invoke(context);
                 } catch (IllegalAccessException | InvocationTargetException e) {
                     e.printStackTrace();
                 }

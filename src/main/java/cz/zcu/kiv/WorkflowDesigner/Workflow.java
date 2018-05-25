@@ -7,6 +7,7 @@ import org.json.JSONObject;
 import org.reflections.Reflections;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationTargetException;
@@ -151,7 +152,7 @@ public class Workflow {
             //Initialize the block I/O and configurations
             block.initialize();
 
-            //IntitIalize values from the JSONObject
+            //Initialize values from the JSONObject
             block.fromJSON(blockObject);
 
             //Set reference ID of block
@@ -200,7 +201,7 @@ public class Workflow {
      * @param jObject
      * @throws Exception
      */
-    public JSONArray execute(JSONObject jObject) throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException, FieldMismatchException {
+    public JSONArray execute(JSONObject jObject, String output_folder) throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException, FieldMismatchException, IOException {
         JSONArray blocksArray = jObject.getJSONArray("blocks");
 
         //Accumulate and index all blocks defined in the workflow
@@ -249,11 +250,29 @@ public class Workflow {
 
                 if (ready) {
                     //Process the ready block
-                    String output = waitBlock.processBlock(dependencies, sourceBlock, sourceParam);
+                    Object output = waitBlock.processBlock(dependencies, sourceBlock, sourceParam);
+
+                    String resultString;
+
+                    if(output==null){
+                        resultString="";
+                    }
+                    else if (output.getClass().equals(String.class)){
+                        resultString=(String)output;
+                    }
+                    else if (output.getClass().equals(File.class)){
+                        File file = (File) output;
+                        String destinationFileName="file_"+new Date().getTime()+"_"+file.getName();
+                        FileUtils.moveFile(file,new File(output_folder+File.separator+destinationFileName));
+                        resultString="<a href=\"rest/workflow/file/"+destinationFileName+"\">"+file.getName()+"</a>";
+                    }
+                    else
+                        resultString="";
+
                     for(int i=0;i<blocksArray.length();i++){
                         JSONObject block=blocksArray.getJSONObject(i);
                         if(block.getInt("id")==waitBlockId){
-                            block.put("output",output);
+                            block.put("output",resultString);
                             break;
                         }
                     }
@@ -300,10 +319,11 @@ public class Workflow {
      * @throws IOException When cannot create file
      */
     public static void main(String[] args) throws FieldMismatchException, NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException, IOException {
-        JSONArray jsonArray=new Workflow(args[0]).execute(new JSONObject(args[1]));
-        String outputFile ="output.txt";
-        if(args.length>2) outputFile=args[2];
-        FileUtils.writeStringToFile(new File(outputFile),jsonArray.toString(4),Charset.defaultCharset());
+        if(args.length<4){
+            throw new IOException("Insufficient Arguments (4 needed)");
+        }
+        JSONArray jsonArray=new Workflow(args[0]).execute(new JSONObject(args[1]), args[3]);
+        FileUtils.writeStringToFile(new File(args[2]),jsonArray.toString(4),Charset.defaultCharset());
     }
 
 }

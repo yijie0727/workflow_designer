@@ -50,7 +50,7 @@ public class WorkflowDesignerTest {
 
         String json = FileUtils.readFileToString(new File("src/main/webapp/test.json"),Charset.defaultCharset());
         JSONObject jsonObject = new JSONObject(json);
-        JSONArray jsonArray = new Workflow("").execute(jsonObject);
+        JSONArray jsonArray = new Workflow("").execute(jsonObject,"src/main/webapp/generatedFiles");
         assert jsonArray !=null;
         assert jsonArray.length() == 3;
         assert  ArithmeticBlock.getOp3()==15;
