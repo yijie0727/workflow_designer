@@ -266,6 +266,11 @@ public class Workflow {
                         FileUtils.moveFile(file,new File(output_folder+File.separator+destinationFileName));
                         resultString="<a href=\"rest/workflow/file/"+destinationFileName+"\">"+file.getName()+"</a>";
                     }
+                    else if (output.getClass().equals(Table.class)){
+                        Table table=(Table)output;
+                        resultString=table.getHTML();
+
+                    }
                     else
                         resultString="";
 
