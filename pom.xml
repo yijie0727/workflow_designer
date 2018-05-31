@@ -6,7 +6,7 @@
 
     <groupId>cz.zcu.kiv</groupId>
     <artifactId>workflow_designer</artifactId>
-    <version>1.3</version>
+    <version>1.4</version>
     <build>
 
         <plugins>
@@ -70,6 +70,11 @@
             <groupId>org.json</groupId>
             <artifactId>json</artifactId>
             <version>20180130</version>
+        </dependency>
+        <dependency>
+            <groupId>commons-logging</groupId>
+            <artifactId>commons-logging</artifactId>
+            <version>1.1.3</version>
         </dependency>
 
 

@@ -1,17 +1,22 @@
 package cz.zcu.kiv.WorkflowDesigner;
 
-import cz.zcu.kiv.WorkflowDesigner.Annotations.BlockExecute;
-import cz.zcu.kiv.WorkflowDesigner.Annotations.BlockInput;
-import cz.zcu.kiv.WorkflowDesigner.Annotations.BlockOutput;
-import cz.zcu.kiv.WorkflowDesigner.Annotations.BlockProperty;
+import cz.zcu.kiv.WorkflowDesigner.Annotations.*;
+import org.apache.commons.io.FileUtils;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.reflections.Reflections;
 
+import java.io.*;
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 
 /***********************************************************************************************************************
  *
@@ -48,6 +53,7 @@ public class Block {
     private Map<String, Data> output;
     private Map<String,Property> properties;
     private Object context;
+    private static Log logger = LogFactory.getLog(Block.class);
 
     public Object getContext() {
         return context;
@@ -78,16 +84,16 @@ public class Block {
                     f.setAccessible(true);
                     BlockProperty blockProperty = f.getAnnotation(BlockProperty.class);
                     if (blockProperty != null) {
-                            if(blockProperty.name().equals(key)){
-                                properties.put(blockProperty.name(), new Property(blockProperty.name(), blockProperty.type(), blockProperty.defaultValue()));
-                                if(f.getType().equals(int.class))
-                                    f.set(context,(int) Double.parseDouble(values.getString(key)));
-                                else if(f.getType().equals(double.class))
+                        if(blockProperty.name().equals(key)){
+                            properties.put(blockProperty.name(), new Property(blockProperty.name(), blockProperty.type(), blockProperty.defaultValue()));
+                            if(f.getType().equals(int.class))
+                                f.set(context,(int) Double.parseDouble(values.getString(key)));
+                            else if(f.getType().equals(double.class))
                                 f.set(context,Double.parseDouble(values.getString(key)));
 
-                                else f.set(context, f.getType().cast(values.getString(key)));
-                                break;
-                            }
+                            else f.set(context, f.getType().cast(values.getString(key)));
+                            break;
+                        }
                     }
                 }
             }
@@ -165,8 +171,10 @@ public class Block {
         return blockjs;
     }
 
-    public Object processBlock(Map<Integer, Block> blocks, Map<String, Integer> sourceBlocks, Map<String, String> sourceParams) throws IllegalAccessException, FieldMismatchException {
+    public Object processBlock(Map<Integer, Block> blocks, Map<String, Integer> sourceBlocks, Map<String, String> sourceParams) throws IllegalAccessException, FieldMismatchException, IOException {
         Object output;
+        BlockData blockData=new BlockData(getName());
+
         if(getInput()!=null&&getInput().size()>0) {
             for (String key : getInput().keySet()) {
                 Data destinationData=getInput().get(key);
@@ -178,7 +186,7 @@ public class Block {
                 Data sourceData=null;
 
                 if(sourceParams.containsKey(key)){
-                        sourceData=source.get(sourceParams.get(key));
+                    sourceData=source.get(sourceParams.get(key));
                 }
 
                 Object value = null;
@@ -192,10 +200,10 @@ public class Block {
 
                     BlockOutput blockOutput = f.getAnnotation(BlockOutput.class);
                     if (blockOutput != null){
-                            if(blockOutput.name().equals(sourceData.getName())) {
-                                value = f.get(sourceBlock.getContext());
-                                break;
-                            }
+                        if(blockOutput.name().equals(sourceData.getName())) {
+                            value = f.get(sourceBlock.getContext());
+                            break;
+                        }
                     }
                 }
 
@@ -204,18 +212,73 @@ public class Block {
 
                     BlockInput blockInput = f.getAnnotation(BlockInput.class);
                     if (blockInput != null) {
-                            if(blockInput.name().equals(destinationData.getName())){
-                                f.set(context,value);
-                                break;
-                            }
+                        if(blockInput.name().equals(destinationData.getName())){
+                            f.set(context,value);
+                            blockData.getInput().put(destinationData.getName(),value);
+                            break;
+                        }
                     }
                 }
 
 
 
+
+
             }
         }
-        output = process();
+
+        for (Field f: context.getClass().getDeclaredFields()) {
+            f.setAccessible(true);
+
+            BlockProperty blockProperty = f.getAnnotation(BlockProperty.class);
+            if (blockProperty != null) {
+                blockData.getProperties().put(blockProperty.name(),f.get(context));
+            }
+        }
+
+
+            try {
+                String fileName = "obj_" + new Date().getTime() ;
+                FileOutputStream fos = new FileOutputStream(new File(fileName+".in"));
+                ObjectOutputStream oos = new ObjectOutputStream(fos);
+                oos.writeObject(blockData);
+                oos.close();
+                ProcessBuilder pb = new ProcessBuilder("java", "-cp", "/Users/Joey/Workspace/GSOC/workflow_designer_server/uploadedFiles/workflow_test-1.0-jar-with-dependencies.jar","cz.zcu.kiv.WorkflowDesigner.Block",fileName+".in",fileName+".out");
+                Process ps = pb.start();
+                ps.waitFor();
+
+                InputStream is=ps.getErrorStream();
+                byte b[]=new byte[is.available()];
+                is.read(b,0,b.length);
+                logger.error(new String(b));
+
+
+
+                is=ps.getInputStream();
+                b=new byte[is.available()];
+                is.read(b,0,b.length);
+                logger.info(new String(b));
+
+                FileInputStream fis = new FileInputStream(fileName+".out");
+                ObjectInputStream ois = new ObjectInputStream(fis);
+                blockData = (BlockData) ois.readObject();
+                ois.close();
+                output=blockData.getProcessOutput();
+
+                for (Field f: context.getClass().getDeclaredFields()) {
+                    f.setAccessible(true);
+                    BlockOutput blockOutput = f.getAnnotation(BlockOutput.class);
+                    if (blockOutput != null) {
+                        f.set(context,blockData.getOutput().get(blockOutput.name()));
+                    }
+                }
+
+            }
+            catch (Exception e){
+                e.printStackTrace();
+                throw new IOException("Error executing Jar");
+            }
+
         setProcessed(true);
         return output;
     }
@@ -269,9 +332,9 @@ public class Block {
 
     public void initialize(){
         if(getProperties()==null)
-        setProperties(new HashMap<String,Property>());
+            setProperties(new HashMap<String,Property>());
         if(getInput()==null)
-        setInput(new HashMap<String, Data>());
+            setInput(new HashMap<String, Data>());
         if(getOutput()==null)
             setOutput(new HashMap<String, Data>());
 
@@ -294,5 +357,89 @@ public class Block {
             }
         }
 
+
+
+    }
+    public static void main(String[] args){
+
+        try {
+
+            FileInputStream fis = new FileInputStream(args[0]);
+            ObjectInputStream ois = new ObjectInputStream(fis);
+            BlockData blockData = (BlockData) ois.readObject();
+            ois.close();
+
+            Set<Class<?>> blockTypes = new Reflections("data").getTypesAnnotatedWith(BlockType.class);
+
+            Class type = null;
+
+            for (Class blockType : blockTypes) {
+                Annotation annotation = blockType.getAnnotation(BlockType.class);
+                Class<? extends Annotation>  currentType = annotation.annotationType();
+
+                String blockTypeName = (String) currentType.getDeclaredMethod("type").invoke(annotation, (Object[]) null);
+                if (blockData.getName().equals(blockTypeName)) {
+                    type=blockType;
+                    break;
+                }
+            }
+
+            Object obj;
+            if(type!=null){
+                obj=type.newInstance();
+            }
+            else{
+                throw new Exception("Error Finding Annotated Class");
+            }
+
+
+            for(Field field:type.getDeclaredFields()){
+                field.setAccessible(true);
+                if(field.getAnnotation(BlockInput.class)!=null){
+                    field.set(obj,blockData.getInput().get(field.getAnnotation(BlockInput.class).name()));
+                }
+                else if(field.getAnnotation(BlockProperty.class)!=null){
+                    field.set(obj,blockData.getProperties().get(field.getAnnotation(BlockProperty.class).name()));
+                }
+            }
+
+
+            Method executeMethod = null;
+
+            for(Method m:type.getDeclaredMethods()){
+                m.setAccessible(true);
+                if(m.getAnnotation(BlockExecute.class)!=null){
+                    executeMethod=m;
+                    break;
+                }
+            }
+
+            if(executeMethod!=null){
+                Object outputObj=executeMethod.invoke(obj);
+                blockData.setProcessOutput(outputObj);
+            }
+            else{
+                throw new Exception("Error finding Execute Method");
+            }
+
+            blockData.setOutput(new HashMap<String, Object>());
+
+            for(Field field:type.getDeclaredFields()){
+                field.setAccessible(true);
+                if(field.getAnnotation(BlockOutput.class)!=null){
+                    blockData.getOutput().put(field.getAnnotation(BlockOutput.class).name(),field.get(obj));
+                }
+
+            }
+
+            FileOutputStream fos = new FileOutputStream(new File(args[1]));
+            ObjectOutputStream oos = new ObjectOutputStream(fos);
+            oos.writeObject(blockData);
+            oos.close();
+
+        }
+        catch (Exception e){
+            e.printStackTrace();
+        }
     }
 }

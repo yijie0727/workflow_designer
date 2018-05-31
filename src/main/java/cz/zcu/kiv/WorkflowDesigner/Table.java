@@ -1,8 +1,9 @@
 package cz.zcu.kiv.WorkflowDesigner;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 
-public class Table {
+public class Table implements Serializable {
     private ArrayList<String> columnHeaders;
     private ArrayList<String> rowHeaders;
     private ArrayList<ArrayList<String>>rows;

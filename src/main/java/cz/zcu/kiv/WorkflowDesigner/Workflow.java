@@ -51,15 +51,13 @@ public class Workflow {
         this.packageName = packageName;
     }
     public Workflow(String packageName,ClassLoader classLoader){
-
         this.packageName = packageName;
         this.classLoader = classLoader;
     }
 
     /**
      * intializeBlocks - Joey Pinto
-     *
-     * This method intializes a directory made up of javascript files with all annotated blocktypes
+     * This method initializes a directory made up of javascript files with all annotated blocktypes
      * @throws IOException - Exception if there is a problem creating directories
      */
     public  JSONArray initializeBlocks() throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
@@ -75,7 +73,7 @@ public class Workflow {
      * getBlockDefinitions - Joey Pinto
      * This method creates a singleton access to block definitions
      *
-     * If not intialized, it searches for all classes with @BlockType annotations and gets the type and family
+     * If not initialized, it searches for all classes with @BlockType annotations and gets the type and family
      * @return List of Block objects
      */
     public  List<Block> getBlockDefinitions() throws IllegalAccessException, InstantiationException, NoSuchMethodException, InvocationTargetException {
@@ -201,7 +199,7 @@ public class Workflow {
      * @param jObject
      * @throws Exception
      */
-    public JSONArray execute(JSONObject jObject, String output_folder) throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException, FieldMismatchException, IOException {
+    public JSONArray execute(JSONObject jObject, String outputFolder) throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException, FieldMismatchException, IOException {
         JSONArray blocksArray = jObject.getJSONArray("blocks");
 
         //Accumulate and index all blocks defined in the workflow
@@ -263,7 +261,7 @@ public class Workflow {
                     else if (output.getClass().equals(File.class)){
                         File file = (File) output;
                         String destinationFileName="file_"+new Date().getTime()+"_"+file.getName();
-                        FileUtils.moveFile(file,new File(output_folder+File.separator+destinationFileName));
+                        FileUtils.moveFile(file,new File(outputFolder+File.separator+destinationFileName));
                         resultString="<a href=\"rest/workflow/file/"+destinationFileName+"\">"+file.getName()+"</a>";
                     }
                     else if (output.getClass().equals(Table.class)){
