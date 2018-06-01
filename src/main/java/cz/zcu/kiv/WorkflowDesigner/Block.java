@@ -11,6 +11,7 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.nio.charset.Charset;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -49,6 +50,7 @@ public class Block {
     private Workflow workflow;
     private String name;
     private String family;
+    private String module;
     private Map<String, Data> input;
     private Map<String, Data> output;
     private Map<String,Property> properties;
@@ -76,6 +78,7 @@ public class Block {
         this.properties = block.getProperties();
         this.input = block.getInput();
         this.output = block.getOutput();
+        this.module = block.getModule();
 
         JSONObject values = blockObject.getJSONObject("values");
         for(String key:this.properties.keySet()){
@@ -90,7 +93,6 @@ public class Block {
                                 f.set(context,(int) Double.parseDouble(values.getString(key)));
                             else if(f.getType().equals(double.class))
                                 f.set(context,Double.parseDouble(values.getString(key)));
-
                             else f.set(context, f.getType().cast(values.getString(key)));
                             break;
                         }
@@ -124,14 +126,19 @@ public class Block {
         this.family = family;
     }
 
-    public String toJS() {
-        return "blocks.register("+ this.toJSON().toString(4)+");";
+    public String getModule() {
+        return module;
+    }
+
+    public void setModule(String module) {
+        this.module = module;
     }
 
     public JSONObject toJSON(){
         JSONObject blockjs=new JSONObject();
         blockjs.put("name",getName());
         blockjs.put("family", getFamily());
+        blockjs.put("module", getModule());
         JSONArray fields=new JSONArray();
         for(String key:properties.keySet()){
             Property property=properties.get(key);
@@ -243,10 +250,17 @@ public class Block {
                 ObjectOutputStream oos = new ObjectOutputStream(fos);
                 oos.writeObject(blockData);
                 oos.close();
-                ProcessBuilder pb = new ProcessBuilder("java", "-cp", "/Users/Joey/Workspace/GSOC/workflow_designer_server/uploadedFiles/workflow_test-1.0-jar-with-dependencies.jar","cz.zcu.kiv.WorkflowDesigner.Block",fileName+".in",fileName+".out");
+                System.out.println("Starting");
+                String[]args=new String[]{"java", "-cp", "/Users/Joey/Workspace/GSOC/workflow_designer_server/uploadedFiles/spark_eeg-1.3-allinone.jar","cz.zcu.kiv.WorkflowDesigner.Block","/Users/Joey/Workspace/GSOC/workflow_designer_server/"+fileName+".in","/Users/Joey/Workspace/GSOC/workflow_designer_server/"+fileName+".out"};
+                for(String arg:args){
+                    System.out.print(arg+" ");
+                }
+                ProcessBuilder pb = new ProcessBuilder(args);
+                pb.redirectError(new File("errde"+new Date().getTime()+"mon.txt"));
+                pb.redirectOutput(new File("de"+new Date().getTime()+"mon.txt"));
                 Process ps = pb.start();
                 ps.waitFor();
-
+                System.out.println("Complete");
                 InputStream is=ps.getErrorStream();
                 byte b[]=new byte[is.available()];
                 is.read(b,0,b.length);
@@ -361,7 +375,14 @@ public class Block {
 
     }
     public static void main(String[] args){
-
+        File file=new File("bingo"+new Date().getTime()+".txt");
+        File file2=new File("bingo"+new Date().getTime()+"err.txt");
+        try {
+            System.setOut(new PrintStream(new FileOutputStream(file)));
+            System.setErr(new PrintStream(new FileOutputStream(file2)));
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
         try {
 
             FileInputStream fis = new FileInputStream(args[0]);
@@ -369,7 +390,7 @@ public class Block {
             BlockData blockData = (BlockData) ois.readObject();
             ois.close();
 
-            Set<Class<?>> blockTypes = new Reflections("data").getTypesAnnotatedWith(BlockType.class);
+            Set<Class<?>> blockTypes = new Reflections("cz.zcu.kiv").getTypesAnnotatedWith(BlockType.class);
 
             Class type = null;
 
@@ -415,7 +436,9 @@ public class Block {
             }
 
             if(executeMethod!=null){
+                System.out.println("Invoked");
                 Object outputObj=executeMethod.invoke(obj);
+                System.out.println("Ended");
                 blockData.setProcessOutput(outputObj);
             }
             else{
@@ -439,7 +462,13 @@ public class Block {
 
         }
         catch (Exception e){
-            e.printStackTrace();
+
+            try {
+                FileUtils.writeStringToFile(new File("error.txt"),e.getMessage(),Charset.defaultCharset());
+            } catch (IOException e1) {
+                e1.printStackTrace();
+            }
+
         }
     }
 }
