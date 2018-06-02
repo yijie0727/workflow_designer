@@ -33,7 +33,7 @@
             "x": 75,
             "y": 17,
             "type": "ARITHMETIC",
-            "module": null,
+            "module": "test.jar:test",
             "values": {
                 "Operation": "add"
             }
@@ -43,7 +43,7 @@
             "x": -163,
             "y": -46,
             "type": "CONSTANT",
-            "module": null,
+            "module": "test.jar:test",
             "values": {
                 "Value": "10"
             }
@@ -53,7 +53,7 @@
             "x": -157,
             "y": 105,
             "type": "CONSTANT",
-            "module": null,
+            "module": "test.jar:test",
             "values": {
                 "Value": "5"
             }

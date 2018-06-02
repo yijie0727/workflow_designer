@@ -8,4 +8,6 @@ public @interface BlockType {
     String type();
 
     String family();
+
+    boolean runAsJar() default false;
 }

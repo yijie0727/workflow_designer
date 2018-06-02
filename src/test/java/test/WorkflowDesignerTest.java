@@ -36,21 +36,23 @@ import java.nio.charset.Charset;
  * WorkflowDesignerTest, 2018/17/05 6:32 Joey Pinto
  *
  * This test verifies the creation of all available blocks in the designer
+ * The test.jar used for testing is the packaged version of the current project with its dependencies.
  **********************************************************************************************************************/
 public class WorkflowDesignerTest {
 
     @Test
     public void testBlock() throws IOException, NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException {
-        JSONArray blocksArray=new Workflow("test").initializeBlocks();
-        FileUtils.writeStringToFile(new File("src/main/webapp/workflow_blocks.json"),blocksArray.toString(4),Charset.defaultCharset());
+        JSONArray blocksArray=new Workflow("test.jar:test",ClassLoader.getSystemClassLoader()).initializeBlocks();
+        assert blocksArray.length()==2;
+        FileUtils.writeStringToFile(new File("test_data/workflow_blocks.json"),blocksArray.toString(4),Charset.defaultCharset());
     }
 
     @Test
     public void testJSON() throws IOException, NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException, FieldMismatchException {
 
-        String json = FileUtils.readFileToString(new File("src/main/webapp/test.json"),Charset.defaultCharset());
+        String json = FileUtils.readFileToString(new File("test_data/test.json"),Charset.defaultCharset());
         JSONObject jsonObject = new JSONObject(json);
-        JSONArray jsonArray = new Workflow("").execute(jsonObject,"src/main/webapp/generatedFiles");
+        JSONArray jsonArray = new Workflow("test.jar:test",ClassLoader.getSystemClassLoader()).execute(jsonObject,"test_data");
         assert jsonArray !=null;
         assert jsonArray.length() == 3;
         assert  ArithmeticBlock.getOp3()==15;

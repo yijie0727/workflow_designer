@@ -51,6 +51,7 @@ public class Block {
     private String name;
     private String family;
     private String module;
+    private boolean jarExecutable;
     private Map<String, Data> input;
     private Map<String, Data> output;
     private Map<String,Property> properties;
@@ -70,7 +71,7 @@ public class Block {
 
     public void fromJSON(JSONObject blockObject) throws NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException {
         this.name = blockObject.getString("type");
-
+        this.module = blockObject.getString("module");
         Block block = workflow.getDefinition(this.name);
 
         if(block==null)return;
@@ -78,7 +79,8 @@ public class Block {
         this.properties = block.getProperties();
         this.input = block.getInput();
         this.output = block.getOutput();
-        this.module = block.getModule();
+        this.jarExecutable = block.isJarExecutable();
+
 
         JSONObject values = blockObject.getJSONObject("values");
         for(String key:this.properties.keySet()){
@@ -226,11 +228,6 @@ public class Block {
                         }
                     }
                 }
-
-
-
-
-
             }
         }
 
@@ -243,41 +240,36 @@ public class Block {
             }
         }
 
-
+            if(isJarExecutable())
             try {
                 String fileName = "obj_" + new Date().getTime() ;
-                FileOutputStream fos = new FileOutputStream(new File(fileName+".in"));
+                File inputFile=new File(fileName+".in");
+                FileOutputStream fos = new FileOutputStream(inputFile);
                 ObjectOutputStream oos = new ObjectOutputStream(fos);
                 oos.writeObject(blockData);
                 oos.close();
-                System.out.println("Starting");
-                String[]args=new String[]{"java", "-cp", "/Users/Joey/Workspace/GSOC/workflow_designer_server/uploadedFiles/spark_eeg-1.3-allinone.jar","cz.zcu.kiv.WorkflowDesigner.Block","/Users/Joey/Workspace/GSOC/workflow_designer_server/"+fileName+".in","/Users/Joey/Workspace/GSOC/workflow_designer_server/"+fileName+".out"};
-                for(String arg:args){
-                    System.out.print(arg+" ");
-                }
+                String[]args=new String[]{"java", "-cp", "/Users/Joey/Workspace/GSOC/workflow_designer_server/uploadedFiles/"+getModule().split(":")[0],"cz.zcu.kiv.WorkflowDesigner.Block","/Users/Joey/Workspace/GSOC/workflow_designer_server/"+fileName+".in","/Users/Joey/Workspace/GSOC/workflow_designer_server/"+fileName+".out",getModule().split(":")[1]};
                 ProcessBuilder pb = new ProcessBuilder(args);
-                pb.redirectError(new File("errde"+new Date().getTime()+"mon.txt"));
-                pb.redirectOutput(new File("de"+new Date().getTime()+"mon.txt"));
                 Process ps = pb.start();
                 ps.waitFor();
-                System.out.println("Complete");
                 InputStream is=ps.getErrorStream();
                 byte b[]=new byte[is.available()];
                 is.read(b,0,b.length);
                 logger.error(new String(b));
-
-
 
                 is=ps.getInputStream();
                 b=new byte[is.available()];
                 is.read(b,0,b.length);
                 logger.info(new String(b));
 
-                FileInputStream fis = new FileInputStream(fileName+".out");
+                File outputFile =new File(fileName+".out");
+                FileInputStream fis = new FileInputStream(outputFile);
                 ObjectInputStream ois = new ObjectInputStream(fis);
                 blockData = (BlockData) ois.readObject();
                 ois.close();
                 output=blockData.getProcessOutput();
+                FileUtils.deleteQuietly(inputFile);
+                FileUtils.deleteQuietly(outputFile);
 
                 for (Field f: context.getClass().getDeclaredFields()) {
                     f.setAccessible(true);
@@ -291,6 +283,9 @@ public class Block {
             catch (Exception e){
                 e.printStackTrace();
                 throw new IOException("Error executing Jar");
+            }
+            else{
+            output=process();
             }
 
         setProcessed(true);
@@ -375,14 +370,7 @@ public class Block {
 
     }
     public static void main(String[] args){
-        File file=new File("bingo"+new Date().getTime()+".txt");
-        File file2=new File("bingo"+new Date().getTime()+"err.txt");
-        try {
-            System.setOut(new PrintStream(new FileOutputStream(file)));
-            System.setErr(new PrintStream(new FileOutputStream(file2)));
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        }
+
         try {
 
             FileInputStream fis = new FileInputStream(args[0]);
@@ -390,7 +378,7 @@ public class Block {
             BlockData blockData = (BlockData) ois.readObject();
             ois.close();
 
-            Set<Class<?>> blockTypes = new Reflections("cz.zcu.kiv").getTypesAnnotatedWith(BlockType.class);
+            Set<Class<?>> blockTypes = new Reflections(args[2]).getTypesAnnotatedWith(BlockType.class);
 
             Class type = null;
 
@@ -436,9 +424,7 @@ public class Block {
             }
 
             if(executeMethod!=null){
-                System.out.println("Invoked");
                 Object outputObj=executeMethod.invoke(obj);
-                System.out.println("Ended");
                 blockData.setProcessOutput(outputObj);
             }
             else{
@@ -470,5 +456,13 @@ public class Block {
             }
 
         }
+    }
+
+    public boolean isJarExecutable() {
+        return jarExecutable;
+    }
+
+    public void setJarExecutable(boolean jarExecutable) {
+        this.jarExecutable = jarExecutable;
     }
 }

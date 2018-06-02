@@ -41,18 +41,23 @@ import java.util.*;
  **********************************************************************************************************************/
 public class Workflow {
 
-    private String packageName;
+//    private String module;
     private ClassLoader classLoader;
+    private Map<Class,String>moduleSource;
+    private String module;
 
 
     private List<Block> blockDefinitions = null;
 
-    public Workflow(String packageName){
-        this.packageName = packageName;
-    }
-    public Workflow(String packageName,ClassLoader classLoader){
-        this.packageName = packageName;
+
+    public Workflow( ClassLoader classLoader, Map<Class, String>moduleSource){
         this.classLoader = classLoader;
+        this.moduleSource = moduleSource;
+    }
+
+    public Workflow( String module,ClassLoader classLoader){
+        this.classLoader = classLoader;
+        this.module = module;
     }
 
     /**
@@ -60,7 +65,7 @@ public class Workflow {
      * This method initializes a directory made up of javascript files with all annotated blocktypes
      * @throws IOException - Exception if there is a problem creating directories
      */
-    public  JSONArray initializeBlocks() throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
+    public JSONArray initializeBlocks() throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
         JSONArray blocksArray=new JSONArray();
         for(Block block:getBlockDefinitions()){
             //Write JS file description of block to array
@@ -81,20 +86,33 @@ public class Workflow {
         else blockDefinitions = new ArrayList<>();
 
         Set<Class<?>> blockTypes;
-        if(classLoader == null){
-            blockTypes = new Reflections(this.packageName).getTypesAnnotatedWith(BlockType.class);
+        if(moduleSource!=null){
+            Collection<String> modules = moduleSource.values();
+            HashSet<String>packages=new HashSet<>();
+            for(String module:modules){
+                packages.add(module.split(":")[1]);
+            }
+            blockTypes = new Reflections(packages.toArray(new String[packages.size()]),this.classLoader).getTypesAnnotatedWith(BlockType.class);
+
         }
-        else{
-            blockTypes = new Reflections(this.packageName,classLoader).getTypesAnnotatedWith(BlockType.class);
-        }
+        else
+            blockTypes = new Reflections(module.split(":")[1],classLoader).getTypesAnnotatedWith(BlockType.class);
+
         for(Class blockType:blockTypes){
                 Block block= new Block(blockType.newInstance(),this);
                 Annotation annotation = blockType.getAnnotation(BlockType.class);
                 Class<? extends Annotation> type = annotation.annotationType();
                 String blockTypeName=(String)type.getDeclaredMethod("type").invoke(annotation, (Object[])null);
                 String blockTypeFamily=(String)type.getDeclaredMethod("family").invoke(annotation, (Object[])null);
+                Boolean jarExecutable = (Boolean) type.getDeclaredMethod("runAsJar").invoke(annotation, (Object[])null);
                 block.setName(blockTypeName);
                 block.setFamily(blockTypeFamily);
+                block.setJarExecutable(jarExecutable);
+                if(moduleSource!=null)
+                    block.setModule(moduleSource.get(blockType));
+                else{
+                    block.setModule(module);
+                }
                 block.initialize();
                 blockDefinitions.add(block);
 
@@ -133,10 +151,18 @@ public class Workflow {
 
             //get Block object by type of block in JSON
             Set<Class<?>> blockTypes;
-            if (this.classLoader == null)
-                blockTypes = new Reflections(this.packageName).getTypesAnnotatedWith(BlockType.class);
-            else
-                blockTypes = new Reflections(this.packageName, this.classLoader).getTypesAnnotatedWith(BlockType.class);
+            if(moduleSource!=null){
+                Collection<String> modules = moduleSource.values();
+                HashSet<String>packages=new HashSet<>();
+                for(String module:modules){
+                    packages.add(module.split(":")[1]);
+                }
+                blockTypes = new Reflections(packages.toArray(new String[packages.size()]),this.classLoader).getTypesAnnotatedWith(BlockType.class);
+            }
+            else{
+                blockTypes = new Reflections(module.split(":")[1],this.classLoader).getTypesAnnotatedWith(BlockType.class);
+            }
+
             for(Class blockType:blockTypes){
                 Annotation annotation = blockType.getAnnotation(BlockType.class);
                 Class<? extends Annotation> type = annotation.annotationType();
@@ -313,7 +339,7 @@ public class Workflow {
 
     /**
      *
-     * @param args 1)package name  2)Workflow JSON 3)(Optional) Output file location (defaults to output.txt)
+     * @param args 1)Module Name 2)Workflow JSON 3)Generated Files dump folder 4) Output file location
      * @throws FieldMismatchException InputField-OutputField Mismatch
      * @throws NoSuchMethodException Reflection Problems
      * @throws InstantiationException
@@ -323,10 +349,12 @@ public class Workflow {
      */
     public static void main(String[] args) throws FieldMismatchException, NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException, IOException {
         if(args.length<4){
-            throw new IOException("Insufficient Arguments (4 needed)");
+            throw new IOException("Insufficient Arguments (5 needed)");
         }
-        JSONArray jsonArray=new Workflow(args[0]).execute(new JSONObject(args[1]), args[3]);
-        FileUtils.writeStringToFile(new File(args[2]),jsonArray.toString(4),Charset.defaultCharset());
+        Workflow workflow = new Workflow(ClassLoader.getSystemClassLoader(),new HashMap<Class, String>());
+        JSONArray jsonArray = workflow.execute(new JSONObject(args[1]), args[2]);
+        FileUtils.writeStringToFile(new File(args[3]),jsonArray.toString(4),Charset.defaultCharset());
     }
+
 
 }
