@@ -239,15 +239,19 @@ public class Block {
             }
         }
 
-            if(isJarExecutable())
+            if(isJarExecutable()&&workflow.getJarDirectory()!=null)
             try {
                 String fileName = "obj_" + new Date().getTime() ;
                 File inputFile=new File(fileName+".in");
+                File outputFile =new File(fileName+".out");
                 FileOutputStream fos = new FileOutputStream(inputFile);
                 ObjectOutputStream oos = new ObjectOutputStream(fos);
                 oos.writeObject(blockData);
                 oos.close();
-                String[]args=new String[]{"java", "-cp", "/Users/Joey/Workspace/GSOC/workflow_designer_server/uploadedFiles/"+getModule().split(":")[0],"cz.zcu.kiv.WorkflowDesigner.Block","/Users/Joey/Workspace/GSOC/workflow_designer_server/"+fileName+".in","/Users/Joey/Workspace/GSOC/workflow_designer_server/"+fileName+".out",getModule().split(":")[1]};
+                File jarDirectory = new File(workflow.getJarDirectory());
+                jarDirectory.mkdirs();
+                File jarFile = new File(jarDirectory.getAbsolutePath()+File.separator+getModule().split(":")[0]);
+                String[]args=new String[]{"java", "-cp",jarFile.getAbsolutePath() ,"cz.zcu.kiv.WorkflowDesigner.Block",inputFile.getAbsolutePath(),outputFile.getAbsolutePath(),getModule().split(":")[1]};
                 ProcessBuilder pb = new ProcessBuilder(args);
                 Process ps = pb.start();
                 ps.waitFor();
@@ -261,7 +265,7 @@ public class Block {
                 is.read(b,0,b.length);
                 logger.info(new String(b));
 
-                File outputFile =new File(fileName+".out");
+
                 FileInputStream fis = new FileInputStream(outputFile);
                 ObjectInputStream ois = new ObjectInputStream(fis);
                 blockData = (BlockData) ois.readObject();

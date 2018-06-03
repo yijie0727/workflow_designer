@@ -42,7 +42,7 @@ public class WorkflowDesignerTest {
 
     @Test
     public void testBlock() throws NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException {
-        JSONArray blocksArray=new Workflow("test.jar:test",ClassLoader.getSystemClassLoader()).initializeBlocks();
+        JSONArray blocksArray=new Workflow(ClassLoader.getSystemClassLoader(),"test.jar:test",null).initializeBlocks();
         assert blocksArray.length()==2;
     }
 
@@ -51,7 +51,7 @@ public class WorkflowDesignerTest {
 
         String json = FileUtils.readFileToString(new File("test_data/test.json"),Charset.defaultCharset());
         JSONObject jsonObject = new JSONObject(json);
-        JSONArray jsonArray = new Workflow("test.jar:test",ClassLoader.getSystemClassLoader()).execute(jsonObject,"test_data");
+        JSONArray jsonArray = new Workflow(ClassLoader.getSystemClassLoader(), "test.jar:test",null).execute(jsonObject,"test_data");
         assert jsonArray !=null;
         assert jsonArray.length() == 3;
         assert  ArithmeticBlock.getOp3()==15;

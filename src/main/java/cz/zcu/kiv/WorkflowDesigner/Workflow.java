@@ -41,20 +41,23 @@ import java.util.*;
  **********************************************************************************************************************/
 public class Workflow {
 
+    private String jarDirectory;
     private ClassLoader classLoader;
     private Map<Class,String>moduleSource;
     private String module;
     private List<Block> blockDefinitions = null;
 
 
-    public Workflow( ClassLoader classLoader, Map<Class, String>moduleSource){
+    public Workflow( ClassLoader classLoader, Map<Class, String>moduleSource, String jarDirectory){
         this.classLoader = classLoader;
         this.moduleSource = moduleSource;
+        this.jarDirectory = jarDirectory;
     }
 
-    public Workflow( String module,ClassLoader classLoader){
+    public Workflow( ClassLoader classLoader, String module, String jarDirectory){
         this.classLoader = classLoader;
         this.module = module;
+        this.jarDirectory =jarDirectory;
     }
 
     /**
@@ -335,21 +338,28 @@ public class Workflow {
         dependencies.put(block1Id, block1);
     }
 
-    /**
-     *
-     * @param args 1)Module Name 2)Workflow JSON 3)Generated Files dump folder 4) Output file location
-     * @throws FieldMismatchException InputField-OutputField Mismatch
-     * @throws NoSuchMethodException Reflection Problems
-     * @throws IOException When cannot create file
-     */
-    public static void main(String[] args) throws FieldMismatchException, NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException, IOException {
-        if(args.length<4){
-            throw new IOException("Insufficient Arguments (5 needed)");
-        }
-        Workflow workflow = new Workflow(ClassLoader.getSystemClassLoader(),new HashMap<Class, String>());
-        JSONArray jsonArray = workflow.execute(new JSONObject(args[1]), args[2]);
-        FileUtils.writeStringToFile(new File(args[3]),jsonArray.toString(4),Charset.defaultCharset());
+//    /**
+//     *
+//     * @param args 1)Module Name 2)Jar Files Location 3)Workflow JSON 4)Generated Files dump folder 5) Output file location
+//     * @throws FieldMismatchException InputField-OutputField Mismatch
+//     * @throws NoSuchMethodException Reflection Problems
+//     * @throws IOException When cannot create file
+//     */
+//    public static void main(String[] args) throws FieldMismatchException, NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException, IOException {
+//        if(args.length<5){
+//            throw new IOException("Insufficient Arguments (5 needed)");
+//        }
+//        Workflow workflow = new Workflow(ClassLoader.getSystemClassLoader(),new HashMap<Class, String>(),args[1]);
+//        JSONArray jsonArray = workflow.execute(new JSONObject(args[2]), args[3]);
+//        FileUtils.writeStringToFile(new File(args[4]),jsonArray.toString(4),Charset.defaultCharset());
+//    }
+
+
+    public String getJarDirectory() {
+        return jarDirectory;
     }
 
-
+    public void setJarDirectory(String jarDirectory) {
+        this.jarDirectory = jarDirectory;
+    }
 }
