@@ -41,12 +41,9 @@ import java.util.*;
  **********************************************************************************************************************/
 public class Workflow {
 
-//    private String module;
     private ClassLoader classLoader;
     private Map<Class,String>moduleSource;
     private String module;
-
-
     private List<Block> blockDefinitions = null;
 
 
@@ -61,7 +58,7 @@ public class Workflow {
     }
 
     /**
-     * intializeBlocks - Joey Pinto
+     * initializeBlocks - Joey Pinto
      * This method initializes a directory made up of javascript files with all annotated blocktypes
      * @throws IOException - Exception if there is a problem creating directories
      */
@@ -81,7 +78,7 @@ public class Workflow {
      * If not initialized, it searches for all classes with @BlockType annotations and gets the type and family
      * @return List of Block objects
      */
-    public  List<Block> getBlockDefinitions() throws IllegalAccessException, InstantiationException, NoSuchMethodException, InvocationTargetException {
+    private List<Block> getBlockDefinitions() throws IllegalAccessException, InstantiationException, NoSuchMethodException, InvocationTargetException {
         if(blockDefinitions !=null) return blockDefinitions;
         else blockDefinitions = new ArrayList<>();
 
@@ -173,6 +170,7 @@ public class Workflow {
                 }
             }
             if(block==null) throw new FieldMismatchException(blockObject.getString("type"),"block type");
+
             //Initialize the block I/O and configurations
             block.initialize();
 
@@ -296,7 +294,7 @@ public class Workflow {
 
                     }
                     else
-                        resultString="";
+                        resultString=output.toString();
 
                     for(int i=0;i<blocksArray.length();i++){
                         JSONObject block=blocksArray.getJSONObject(i);
@@ -342,9 +340,6 @@ public class Workflow {
      * @param args 1)Module Name 2)Workflow JSON 3)Generated Files dump folder 4) Output file location
      * @throws FieldMismatchException InputField-OutputField Mismatch
      * @throws NoSuchMethodException Reflection Problems
-     * @throws InstantiationException
-     * @throws IllegalAccessException
-     * @throws InvocationTargetException
      * @throws IOException When cannot create file
      */
     public static void main(String[] args) throws FieldMismatchException, NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException, IOException {

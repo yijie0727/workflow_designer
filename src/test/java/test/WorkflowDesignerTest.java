@@ -41,10 +41,9 @@ import java.nio.charset.Charset;
 public class WorkflowDesignerTest {
 
     @Test
-    public void testBlock() throws IOException, NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException {
+    public void testBlock() throws NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException {
         JSONArray blocksArray=new Workflow("test.jar:test",ClassLoader.getSystemClassLoader()).initializeBlocks();
         assert blocksArray.length()==2;
-        FileUtils.writeStringToFile(new File("test_data/workflow_blocks.json"),blocksArray.toString(4),Charset.defaultCharset());
     }
 
     @Test

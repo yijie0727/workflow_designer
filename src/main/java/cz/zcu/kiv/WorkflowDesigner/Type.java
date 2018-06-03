@@ -28,8 +28,4 @@ public class Type {
     public static final String NUMBER = "NUMBER";
 
     public static final String STRING = "STRING";
-
-    public static final String STRING_ARRAY = "STRING[]";
-
-    public static final String NUMBER_ARRAY = "NUMBER[]";
 }

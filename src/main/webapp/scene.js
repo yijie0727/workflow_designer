@@ -1,1 +1,0 @@
-var scene = {"edges":[],"blocks":[]};
