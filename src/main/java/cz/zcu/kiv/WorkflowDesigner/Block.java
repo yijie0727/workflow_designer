@@ -68,12 +68,16 @@ public class Block {
     //Temporary variables
     private boolean processed=false;
 
-    public void fromJSON(JSONObject blockObject) throws NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException {
+    public void fromJSON(JSONObject blockObject) throws NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException, FieldMismatchException {
         this.name = blockObject.getString("type");
         this.module = blockObject.getString("module");
         Block block = workflow.getDefinition(this.name);
 
-        if(block==null)return;
+        if(block==null){
+            logger.error("Could not find definition of block type "+this.name);
+            throw new FieldMismatchException(this.name,"block type");
+        }
+
         this.family = block.getFamily();
         this.properties = block.getProperties();
         this.input = block.getInput();
@@ -102,6 +106,7 @@ public class Block {
             }
         }
 
+        logger.info("Instantiated "+getName()+" block from Workflow");
 
     }
 
@@ -136,10 +141,10 @@ public class Block {
     }
 
     public JSONObject toJSON(){
-        JSONObject blockjs=new JSONObject();
-        blockjs.put("name",getName());
-        blockjs.put("family", getFamily());
-        blockjs.put("module", getModule());
+        JSONObject blockJs=new JSONObject();
+        blockJs.put("name",getName());
+        blockJs.put("family", getFamily());
+        blockJs.put("module", getModule());
         JSONArray fields=new JSONArray();
         for(String key:properties.keySet()){
             Property property=properties.get(key);
@@ -166,29 +171,34 @@ public class Block {
         if(output!=null && output.size()!=0) {
             for(String outputParam:output.keySet()){
                 Data outputValue=output.get(outputParam);
-                JSONObject outpuObj = new JSONObject();
-                outpuObj.put("name", outputValue.getName());
-                outpuObj.put("type", outputValue.getType());
-                outpuObj.put("attrs", "output");
-                outpuObj.put("card", outputValue.getCardinality());
-                fields.put(outpuObj);
+                JSONObject outputObj = new JSONObject();
+                outputObj.put("name", outputValue.getName());
+                outputObj.put("type", outputValue.getType());
+                outputObj.put("attrs", "output");
+                outputObj.put("card", outputValue.getCardinality());
+                fields.put(outputObj);
             }
         }
-        blockjs.put("fields", fields);
+        blockJs.put("fields", fields);
 
-        return blockjs;
+        return blockJs;
     }
 
     public Object processBlock(Map<Integer, Block> blocks, Map<String, Integer> sourceBlocks, Map<String, String> sourceParams) throws IllegalAccessException, FieldMismatchException, IOException {
         Object output;
         BlockData blockData=new BlockData(getName());
 
+        logger.info("Processing a "+getName()+" block");
+
         if(getInput()!=null&&getInput().size()>0) {
             for (String key : getInput().keySet()) {
                 Data destinationData=getInput().get(key);
                 Block sourceBlock = blocks.get(sourceBlocks.get(key));
 
-                if(sourceBlock==null) throw new FieldMismatchException(key,"source");
+                if(sourceBlock==null){
+                    logger.error("Could not find the source block for the input "+key+" for a "+getName()+" block");
+                    throw new FieldMismatchException(key,"source");
+                }
 
                 Map<String, Data> source = sourceBlock.getOutput();
                 Data sourceData=null;
@@ -239,59 +249,71 @@ public class Block {
             }
         }
 
-            if(isJarExecutable()&&workflow.getJarDirectory()!=null)
-            try {
-                String fileName = "obj_" + new Date().getTime() ;
-                File inputFile=new File(fileName+".in");
-                File outputFile =new File(fileName+".out");
-                FileOutputStream fos = new FileOutputStream(inputFile);
-                ObjectOutputStream oos = new ObjectOutputStream(fos);
-                oos.writeObject(blockData);
-                oos.close();
-                File jarDirectory = new File(workflow.getJarDirectory());
-                jarDirectory.mkdirs();
-                File jarFile = new File(jarDirectory.getAbsolutePath()+File.separator+getModule().split(":")[0]);
-                String[]args=new String[]{"java", "-cp",jarFile.getAbsolutePath() ,"cz.zcu.kiv.WorkflowDesigner.Block",inputFile.getAbsolutePath(),outputFile.getAbsolutePath(),getModule().split(":")[1]};
-                ProcessBuilder pb = new ProcessBuilder(args);
-                Process ps = pb.start();
-                ps.waitFor();
-                InputStream is=ps.getErrorStream();
-                byte b[]=new byte[is.available()];
-                is.read(b,0,b.length);
-                logger.error(new String(b));
+            if(isJarExecutable()&&workflow.getJarDirectory()!=null){
+                logger.info("Executing "+getName()+" as a JAR");
+                try {
+                    String fileName = "obj_" + new Date().getTime() ;
+                    File inputFile=new File(fileName+".in");
+                    File outputFile =new File(fileName+".out");
 
-                is=ps.getInputStream();
-                b=new byte[is.available()];
-                is.read(b,0,b.length);
-                logger.info(new String(b));
+                    //Serialize and write BlockData object to a file
+                    FileOutputStream fos = new FileOutputStream(inputFile);
+                    ObjectOutputStream oos = new ObjectOutputStream(fos);
+                    oos.writeObject(blockData);
+                    oos.close();
+
+                    File jarDirectory = new File(workflow.getJarDirectory());
+                    jarDirectory.mkdirs();
+                    String jarFilePath = jarDirectory.getAbsolutePath()+File.separator+getModule().split(":")[0];
+                    File jarFile = new File(jarFilePath);
+                    String[]args=new String[]{"java", "-cp",jarFile.getAbsolutePath() ,"cz.zcu.kiv.WorkflowDesigner.Block",inputFile.getAbsolutePath(),outputFile.getAbsolutePath(),getModule().split(":")[1]};
+                    ProcessBuilder pb = new ProcessBuilder(args);
+
+                    logger.info("Executing jar file "+jarFilePath);
+                    Process ps = pb.start();
+                    ps.waitFor();
+                    InputStream is=ps.getErrorStream();
+                    byte b[]=new byte[is.available()];
+                    is.read(b,0,b.length);
+                    logger.error(new String(b));
+
+                    is=ps.getInputStream();
+                    b=new byte[is.available()];
+                    is.read(b,0,b.length);
+                    logger.info(new String(b));
 
 
-                FileInputStream fis = new FileInputStream(outputFile);
-                ObjectInputStream ois = new ObjectInputStream(fis);
-                blockData = (BlockData) ois.readObject();
-                ois.close();
-                output=blockData.getProcessOutput();
-                FileUtils.deleteQuietly(inputFile);
-                FileUtils.deleteQuietly(outputFile);
+                    FileInputStream fis = new FileInputStream(outputFile);
+                    ObjectInputStream ois = new ObjectInputStream(fis);
+                    blockData = (BlockData) ois.readObject();
+                    ois.close();
 
-                for (Field f: context.getClass().getDeclaredFields()) {
-                    f.setAccessible(true);
-                    BlockOutput blockOutput = f.getAnnotation(BlockOutput.class);
-                    if (blockOutput != null) {
-                        f.set(context,blockData.getOutput().get(blockOutput.name()));
+                    output=blockData.getProcessOutput();
+                    FileUtils.deleteQuietly(inputFile);
+                    FileUtils.deleteQuietly(outputFile);
+
+                    for (Field f: context.getClass().getDeclaredFields()) {
+                        f.setAccessible(true);
+                        BlockOutput blockOutput = f.getAnnotation(BlockOutput.class);
+                        if (blockOutput != null) {
+                            f.set(context,blockData.getOutput().get(blockOutput.name()));
+                        }
                     }
-                }
 
-            }
-            catch (Exception e){
-                e.printStackTrace();
-                throw new IOException("Error executing Jar");
+                }
+                catch (Exception e){
+                    e.printStackTrace();
+                    logger.error("Error executing Jar file "+e);
+                    throw new IOException("Error executing Jar "+e.getMessage());
+                }
             }
             else{
-            output=process();
+                logger.info("Executing "+getName()+" block natively");
+                output=process();
             }
 
         setProcessed(true);
+        logger.info("Execution of "+getName()+ " block completed successfully");
         return output;
     }
 
@@ -368,14 +390,19 @@ public class Block {
                 output.put(blockOutput.name(),new Data(blockOutput.name(),blockOutput.type(),blockOutput.cardinality()));
             }
         }
-
-
+        logger.info("Initialized "+getName()+" block from annotations");
 
     }
+
+    /**
+     *  Externally access main function, modification of parameters will affect reflective access
+     *
+     * @param args 1) serialized input file 2) serialized output file 3) Package Name
+     */
     public static void main(String[] args){
 
         try {
-
+            //Reading BlockData object from file
             FileInputStream fis = new FileInputStream(args[0]);
             ObjectInputStream ois = new ObjectInputStream(fis);
             BlockData blockData = (BlockData) ois.readObject();
@@ -401,6 +428,7 @@ public class Block {
                 obj=type.newInstance();
             }
             else{
+                logger.error("No classes with Workflow Designer BlockType Annotations were found!");
                 throw new Exception("Error Finding Annotated Class");
             }
 
@@ -431,6 +459,7 @@ public class Block {
                 blockData.setProcessOutput(outputObj);
             }
             else{
+                logger.error("No method annotated with Workflow Designer BlockExecute was found");
                 throw new Exception("Error finding Execute Method");
             }
 
@@ -444,6 +473,7 @@ public class Block {
 
             }
 
+            //Write output object to file
             FileOutputStream fos = new FileOutputStream(new File(args[1]));
             ObjectOutputStream oos = new ObjectOutputStream(fos);
             oos.writeObject(blockData);

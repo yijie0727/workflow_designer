@@ -2,6 +2,8 @@ package cz.zcu.kiv.WorkflowDesigner;
 
 import cz.zcu.kiv.WorkflowDesigner.Annotations.BlockType;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.reflections.Reflections;
@@ -48,6 +50,8 @@ public class Workflow {
     private List<Block> blockDefinitions = null;
 
 
+    private static Log logger = LogFactory.getLog(Workflow.class);
+
     public Workflow( ClassLoader classLoader, Map<Class, String>moduleSource, String jarDirectory){
         this.classLoader = classLoader;
         this.moduleSource = moduleSource;
@@ -71,6 +75,7 @@ public class Workflow {
             //Write JS file description of block to array
             blocksArray.put(block.toJSON());
         }
+        logger.info("Initialized "+blocksArray.length()+" blocks");
         return blocksArray;
     }
 
@@ -172,13 +177,16 @@ public class Workflow {
                         break;
                 }
             }
-            if(block==null) throw new FieldMismatchException(blockObject.getString("type"),"block type");
-
-            //Initialize the block I/O and configurations
-            block.initialize();
+            if(block==null) {
+                logger.error("No class for "+blockObject.getString("type") + " block type found");
+                throw new FieldMismatchException(blockObject.getString("type"),"block type");
+            }
 
             //Initialize values from the JSONObject
             block.fromJSON(blockObject);
+
+            //Initialize the block I/O and configurations
+            block.initialize();
 
             //Set reference ID of block
             blocks.put(blockObject.getInt("id"),block);
@@ -211,9 +219,8 @@ public class Workflow {
                     wait.add(edgeObject.getInt("block2"));
                 }
             }
-
-
         }
+        logger.info("Wait list has "+wait.size()+" blocks");
         return wait;
     }
 
@@ -227,6 +234,8 @@ public class Workflow {
      * @throws Exception
      */
     public JSONArray execute(JSONObject jObject, String outputFolder) throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException, FieldMismatchException, IOException {
+
+        logger.info("Starting execution of Workflow");
         JSONArray blocksArray = jObject.getJSONArray("blocks");
 
         //Accumulate and index all blocks defined in the workflow
@@ -274,6 +283,7 @@ public class Workflow {
                 }
 
                 if (ready) {
+                    logger.info("Processing block with ID "+waitBlockId);
                     //Process the ready block
                     Object output = waitBlock.processBlock(dependencies, sourceBlock, sourceParam);
 
@@ -311,6 +321,8 @@ public class Workflow {
 
             }
         }
+
+        logger.info("Workflow Execution complete");
         return blocksArray;
     }
 
