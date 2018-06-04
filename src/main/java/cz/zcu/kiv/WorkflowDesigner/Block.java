@@ -270,6 +270,8 @@ public class Block {
                     ProcessBuilder pb = new ProcessBuilder(args);
 
                     logger.info("Executing jar file "+jarFilePath);
+                    pb.redirectOutput(new File("std_output.log"));
+                    pb.redirectError(new File("std_error.log"));
                     Process ps = pb.start();
                     ps.waitFor();
                     InputStream is=ps.getErrorStream();
