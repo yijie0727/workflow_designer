@@ -284,6 +284,8 @@ public class Workflow {
 
                 if (ready) {
                     logger.info("Processing block with ID "+waitBlockId);
+//                    StringBuilder stdOutBuilder =new StringBuilder();
+//                    StringBuilder stdErrBuilder =new StringBuilder();
                     //Process the ready block
                     Object output = waitBlock.processBlock(dependencies, sourceBlock, sourceParam);
 

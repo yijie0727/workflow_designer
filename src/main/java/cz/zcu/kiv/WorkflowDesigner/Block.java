@@ -253,8 +253,8 @@ public class Block {
                 logger.info("Executing "+getName()+" as a JAR");
                 try {
                     String fileName = "obj_" + new Date().getTime() ;
-                    File inputFile=new File(fileName+".in");
-                    File outputFile =new File(fileName+".out");
+                    File inputFile=new File(workflow.getJarDirectory()+File.separator+fileName+".in");
+                    File outputFile =new File(workflow.getJarDirectory()+File.separator+fileName+".out");
 
                     //Serialize and write BlockData object to a file
                     FileOutputStream fos = new FileOutputStream(inputFile);
@@ -305,13 +305,22 @@ public class Block {
                 }
                 catch (Exception e){
                     e.printStackTrace();
-                    logger.error("Error executing Jar file "+e);
+//                    errOut.append(org.apache.commons.lang3.exception.ExceptionUtils.getStackTrace(e));
+                    logger.error("Error executing Jar file",e);
                     throw new IOException("Error executing Jar "+e.getMessage());
                 }
             }
             else{
                 logger.info("Executing "+getName()+" block natively");
-                output=process();
+                try {
+                    output = process();
+                }
+                catch (Exception e){
+                    e.printStackTrace();
+//                    errOut.append(org.apache.commons.lang3.exception.ExceptionUtils.getStackTrace(e));
+                    logger.error("Error executing Block natively",e);
+                    throw new IOException("Error executing Block "+e.getMessage());
+                }
             }
 
         setProcessed(true);
@@ -319,16 +328,13 @@ public class Block {
         return output;
     }
 
-    public Object process(){
+    public Object process() throws InvocationTargetException, IllegalAccessException {
         Object output = null;
         for(Method method:context.getClass().getDeclaredMethods()){
             method.setAccessible(true);
             if(method.getAnnotation(BlockExecute.class)!=null){
-                try {
                     output =  method.invoke(context);
-                } catch (IllegalAccessException | InvocationTargetException e) {
-                    e.printStackTrace();
-                }
+                    break;
             }
         }
         return output;
