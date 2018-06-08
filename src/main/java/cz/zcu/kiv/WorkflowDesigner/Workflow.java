@@ -203,8 +203,8 @@ public class Workflow {
      * @param blocks
      * @return
      */
-    public ArrayList<Integer> populateWaitList(JSONArray edgesArray, Map<Integer,Block>blocks){
-        ArrayList<Integer>wait=new ArrayList<>();
+    public List<Integer> populateWaitList(JSONArray edgesArray, Map<Integer,Block>blocks){
+        List<Integer>wait=new ArrayList<>();
         for(int i=0;i<edgesArray.length();i++) {
             JSONObject edgeObject = edgesArray.getJSONObject(i);
             Block block1 = blocks.get(edgeObject.getInt("block1"));
@@ -351,23 +351,7 @@ public class Workflow {
 
         dependencies.put(block1Id, block1);
     }
-
-//    /**
-//     *
-//     * @param args 1)Module Name 2)Jar Files Location 3)Workflow JSON 4)Generated Files dump folder 5) Output file location
-//     * @throws FieldMismatchException InputField-OutputField Mismatch
-//     * @throws NoSuchMethodException Reflection Problems
-//     * @throws IOException When cannot create file
-//     */
-//    public static void main(String[] args) throws FieldMismatchException, NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException, IOException {
-//        if(args.length<5){
-//            throw new IOException("Insufficient Arguments (5 needed)");
-//        }
-//        Workflow workflow = new Workflow(ClassLoader.getSystemClassLoader(),new HashMap<Class, String>(),args[1]);
-//        JSONArray jsonArray = workflow.execute(new JSONObject(args[2]), args[3]);
-//        FileUtils.writeStringToFile(new File(args[4]),jsonArray.toString(4),Charset.defaultCharset());
-//    }
-
+    
 
     public String getJarDirectory() {
         return jarDirectory;

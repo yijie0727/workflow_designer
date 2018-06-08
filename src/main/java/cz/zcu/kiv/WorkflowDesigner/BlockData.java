@@ -2,6 +2,8 @@ package cz.zcu.kiv.WorkflowDesigner;
 
 import java.io.Serializable;
 import java.util.HashMap;
+import java.util.Map;
+
 /***********************************************************************************************************************
  *
  * This file is part of the Workflow Designer project
@@ -29,9 +31,9 @@ import java.util.HashMap;
  **********************************************************************************************************************/
 
 public class BlockData implements Serializable {
-    HashMap<String, Object> input;
-    HashMap<String, Object> output;
-    HashMap<String, Object> properties;
+    Map<String, Object> input;
+    Map<String, Object> output;
+    Map<String, Object> properties;
     Object processOutput;
     String name;
 
@@ -50,27 +52,27 @@ public class BlockData implements Serializable {
         this.name = name;
     }
 
-    public HashMap<String, Object> getInput() {
+    public Map<String, Object> getInput() {
         return input;
     }
 
-    public void setInput(HashMap<String, Object> input) {
+    public void setInput(Map<String, Object> input) {
         this.input = input;
     }
 
-    public HashMap<String, Object> getOutput() {
+    public Map<String, Object> getOutput() {
         return output;
     }
 
-    public void setOutput(HashMap<String, Object> output) {
+    public void setOutput(Map<String, Object> output) {
         this.output = output;
     }
 
-    public HashMap<String, Object> getProperties() {
+    public Map<String, Object> getProperties() {
         return properties;
     }
 
-    public void setProperties(HashMap<String, Object> properties) {
+    public void setProperties(Map<String, Object> properties) {
         this.properties = properties;
     }
 

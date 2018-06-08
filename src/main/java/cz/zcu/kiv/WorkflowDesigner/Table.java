@@ -2,6 +2,7 @@ package cz.zcu.kiv.WorkflowDesigner;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.List;
 
 /***********************************************************************************************************************
  *
@@ -30,31 +31,31 @@ import java.util.ArrayList;
  **********************************************************************************************************************/
 
 public class Table implements Serializable {
-    private ArrayList<String> columnHeaders;
-    private ArrayList<String> rowHeaders;
-    private ArrayList<ArrayList<String>>rows;
+    private List<String> columnHeaders;
+    private List<String> rowHeaders;
+    private List<List<String>>rows;
 
-    public ArrayList<String> getColumnHeaders() {
+    public List<String> getColumnHeaders() {
         return columnHeaders ;
     }
 
-    public void setColumnHeaders(ArrayList<String> columnHeaders) {
+    public void setColumnHeaders(List<String> columnHeaders) {
         this.columnHeaders = columnHeaders;
     }
 
-    public ArrayList<String> getRowHeaders() {
+    public List<String> getRowHeaders() {
         return rowHeaders;
     }
 
-    public void setRowHeaders(ArrayList<String> rowHeaders) {
+    public void setRowHeaders(List<String> rowHeaders) {
         this.rowHeaders = rowHeaders;
     }
 
-    public ArrayList<ArrayList<String>> getRows() {
+    public List<List<String>> getRows() {
         return rows;
     }
 
-    public void setRows(ArrayList<ArrayList<String>> rows) {
+    public void setRows(List<List<String>> rows) {
         this.rows = rows;
     }
 

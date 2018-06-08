@@ -489,13 +489,7 @@ public class Block {
 
         }
         catch (Exception e){
-
-            try {
-                FileUtils.writeStringToFile(new File("error.txt"),e.getMessage(),Charset.defaultCharset());
-            } catch (IOException e1) {
-                e1.printStackTrace();
-            }
-
+            logger.error(e);
         }
     }
 
