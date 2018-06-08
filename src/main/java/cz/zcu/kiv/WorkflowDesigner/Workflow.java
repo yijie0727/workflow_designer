@@ -351,7 +351,7 @@ public class Workflow {
 
         dependencies.put(block1Id, block1);
     }
-    
+
 
     public String getJarDirectory() {
         return jarDirectory;

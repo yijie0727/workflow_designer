@@ -2,6 +2,7 @@ package cz.zcu.kiv.WorkflowDesigner;
 
 import cz.zcu.kiv.WorkflowDesigner.Annotations.*;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.SerializationUtils;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.reflections.Reflections;
@@ -411,10 +412,7 @@ public class Block {
 
         try {
             //Reading BlockData object from file
-            FileInputStream fis = new FileInputStream(args[0]);
-            ObjectInputStream ois = new ObjectInputStream(fis);
-            BlockData blockData = (BlockData) ois.readObject();
-            ois.close();
+            BlockData blockData = SerializationUtils.deserialize(FileUtils.readFileToByteArray(new File(args[0])));
 
             Set<Class<?>> blockTypes = new Reflections(args[2]).getTypesAnnotatedWith(BlockType.class);
 
@@ -482,10 +480,9 @@ public class Block {
             }
 
             //Write output object to file
-            FileOutputStream fos = new FileOutputStream(new File(args[1]));
-            ObjectOutputStream oos = new ObjectOutputStream(fos);
-            oos.writeObject(blockData);
-            oos.close();
+            FileOutputStream fos = FileUtils.openOutputStream(new File(args[1]));
+            SerializationUtils.serialize(blockData,fos);
+            fos.close();
 
         }
         catch (Exception e){
