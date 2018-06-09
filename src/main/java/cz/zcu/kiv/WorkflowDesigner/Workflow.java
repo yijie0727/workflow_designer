@@ -326,10 +326,11 @@ public class Workflow {
                             break;
                         }
                     }
-                    break;
-                }
 
+                }
+                if(error)break;
             }
+
         }
 
         logger.info("Workflow Execution complete");

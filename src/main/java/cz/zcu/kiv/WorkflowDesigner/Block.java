@@ -185,7 +185,7 @@ public class Block {
         return blockJs;
     }
 
-    public Object processBlock(Map<Integer, Block> blocks, Map<String, Integer> sourceBlocks, Map<String, String> sourceParams, StringBuilder stdOut, StringBuilder stdErr) throws IllegalAccessException, FieldMismatchException, IOException {
+    public Object processBlock(Map<Integer, Block> blocks, Map<String, Integer> sourceBlocks, Map<String, String> sourceParams, StringBuilder stdOut, StringBuilder stdErr) throws Exception {
         Object output = null;
         BlockData blockData=new BlockData(getName());
 
@@ -293,6 +293,8 @@ public class Block {
                     logger.info(outputString);
                     stdOut.append(outputString);
 
+                    FileUtils.deleteQuietly(inputFile);
+
                     if(outputFile.exists()){
                         FileInputStream fis = new FileInputStream(outputFile);
                         ObjectInputStream ois = new ObjectInputStream(fis);
@@ -308,18 +310,17 @@ public class Block {
                             }
                         }
                     }
-
-                    FileUtils.deleteQuietly(inputFile);
-
-
+//                    else{
+//                        throw new Exception("Output file does not exist");
+//                    }
 
 
                 }
-                catch (Exception e){
+                catch (Exception e) {
                     e.printStackTrace();
                     stdErr.append(org.apache.commons.lang3.exception.ExceptionUtils.getStackTrace(e));
-                    logger.error("Error executing Jar file",e);
-                    throw new IOException("Error executing Jar "+e.getMessage());
+                    logger.error("Error executing Jar file", e);
+                    throw e;
                 }
             }
             else{
@@ -331,7 +332,7 @@ public class Block {
                     e.printStackTrace();
                     stdErr.append(org.apache.commons.lang3.exception.ExceptionUtils.getStackTrace(e));
                     logger.error("Error executing Block natively",e);
-                    throw new IOException("Error executing Block "+e.getMessage());
+                    throw e;
                 }
             }
 
