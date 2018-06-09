@@ -30,6 +30,12 @@ public class ArithmeticBlock {
             case "subtract":
                 op3=op1-op2;
                 break;
+            case "multiply":
+                op3=op1*op2;
+                break;
+            case "divide":
+                op3=op1/op2;
+                break;
         }
         return String.valueOf(op3);
     }

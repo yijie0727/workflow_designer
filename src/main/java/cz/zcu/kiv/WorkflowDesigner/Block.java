@@ -185,8 +185,8 @@ public class Block {
         return blockJs;
     }
 
-    public Object processBlock(Map<Integer, Block> blocks, Map<String, Integer> sourceBlocks, Map<String, String> sourceParams) throws IllegalAccessException, FieldMismatchException, IOException {
-        Object output;
+    public Object processBlock(Map<Integer, Block> blocks, Map<String, Integer> sourceBlocks, Map<String, String> sourceParams, StringBuilder stdOut, StringBuilder stdErr) throws IllegalAccessException, FieldMismatchException, IOException {
+        Object output = null;
         BlockData blockData=new BlockData(getName());
 
         logger.info("Processing a "+getName()+" block");
@@ -271,42 +271,53 @@ public class Block {
                     ProcessBuilder pb = new ProcessBuilder(args);
 
                     logger.info("Executing jar file "+jarFilePath);
-                    pb.redirectOutput(new File("std_output.log"));
-                    pb.redirectError(new File("std_error.log"));
+                    File stdOutFile = new File("std_output.log");
+                    pb.redirectOutput(stdOutFile);
+                    File stdErrFile = new File("std_error.log");
+                    pb.redirectError(stdErrFile);
                     Process ps = pb.start();
                     ps.waitFor();
+                    stdOut.append(FileUtils.readFileToString(stdOutFile,Charset.defaultCharset()));
+                    stdErr.append(FileUtils.readFileToString(stdErrFile,Charset.defaultCharset()));
                     InputStream is=ps.getErrorStream();
                     byte b[]=new byte[is.available()];
                     is.read(b,0,b.length);
-                    logger.error(new String(b));
+                    String errorString = new String(b);
+                    logger.error(errorString);
+                    stdErr.append(errorString);
 
                     is=ps.getInputStream();
                     b=new byte[is.available()];
                     is.read(b,0,b.length);
-                    logger.info(new String(b));
+                    String outputString = new String(b);
+                    logger.info(outputString);
+                    stdOut.append(outputString);
 
-
-                    FileInputStream fis = new FileInputStream(outputFile);
-                    ObjectInputStream ois = new ObjectInputStream(fis);
-                    blockData = (BlockData) ois.readObject();
-                    ois.close();
-
-                    output=blockData.getProcessOutput();
-                    FileUtils.deleteQuietly(inputFile);
-                    FileUtils.deleteQuietly(outputFile);
-
-                    for (Field f: context.getClass().getDeclaredFields()) {
-                        f.setAccessible(true);
-                        BlockOutput blockOutput = f.getAnnotation(BlockOutput.class);
-                        if (blockOutput != null) {
-                            f.set(context,blockData.getOutput().get(blockOutput.name()));
+                    if(outputFile.exists()){
+                        FileInputStream fis = new FileInputStream(outputFile);
+                        ObjectInputStream ois = new ObjectInputStream(fis);
+                        blockData = (BlockData) ois.readObject();
+                        ois.close();
+                        output=blockData.getProcessOutput();
+                        FileUtils.deleteQuietly(outputFile);
+                        for (Field f: context.getClass().getDeclaredFields()) {
+                            f.setAccessible(true);
+                            BlockOutput blockOutput = f.getAnnotation(BlockOutput.class);
+                            if (blockOutput != null) {
+                                f.set(context,blockData.getOutput().get(blockOutput.name()));
+                            }
                         }
                     }
+
+                    FileUtils.deleteQuietly(inputFile);
+
+
+
 
                 }
                 catch (Exception e){
                     e.printStackTrace();
-//                    errOut.append(org.apache.commons.lang3.exception.ExceptionUtils.getStackTrace(e));
+                    stdErr.append(org.apache.commons.lang3.exception.ExceptionUtils.getStackTrace(e));
                     logger.error("Error executing Jar file",e);
                     throw new IOException("Error executing Jar "+e.getMessage());
                 }
@@ -318,7 +329,7 @@ public class Block {
                 }
                 catch (Exception e){
                     e.printStackTrace();
-//                    errOut.append(org.apache.commons.lang3.exception.ExceptionUtils.getStackTrace(e));
+                    stdErr.append(org.apache.commons.lang3.exception.ExceptionUtils.getStackTrace(e));
                     logger.error("Error executing Block natively",e);
                     throw new IOException("Error executing Block "+e.getMessage());
                 }
@@ -486,7 +497,7 @@ public class Block {
 
         }
         catch (Exception e){
-            logger.error(e);
+            logger.error(org.apache.commons.lang3.exception.ExceptionUtils.getStackTrace(e));
         }
     }
 

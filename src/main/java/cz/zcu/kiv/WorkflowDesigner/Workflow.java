@@ -244,7 +244,8 @@ public class Workflow {
         JSONArray edgesArray = jObject.getJSONArray("edges");
 
         Block waitBlock;
-        while(true){
+        boolean error=false;
+        while(!error){
             //Populate wait list
             List<Integer>wait= populateWaitList(edgesArray,blocks);
 
@@ -284,11 +285,16 @@ public class Workflow {
 
                 if (ready) {
                     logger.info("Processing block with ID "+waitBlockId);
-//                    StringBuilder stdOutBuilder =new StringBuilder();
-//                    StringBuilder stdErrBuilder =new StringBuilder();
+                    StringBuilder stdOutBuilder =new StringBuilder();
+                    StringBuilder stdErrBuilder =new StringBuilder();
                     //Process the ready block
-                    Object output = waitBlock.processBlock(dependencies, sourceBlock, sourceParam);
-
+                    Object output = null;
+                    try {
+                        output = waitBlock.processBlock(dependencies, sourceBlock, sourceParam, stdOutBuilder, stdErrBuilder);
+                    }
+                    catch(Exception e){
+                        error=true;
+                    }
                     String resultString;
 
                     if(output==null){
@@ -315,6 +321,8 @@ public class Workflow {
                         JSONObject block=blocksArray.getJSONObject(i);
                         if(block.getInt("id")==waitBlockId){
                             block.put("output",resultString);
+                            block.put("stdout",stdOutBuilder.toString());
+                            block.put("stderr",stdErrBuilder.toString());
                             break;
                         }
                     }
