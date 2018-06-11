@@ -283,15 +283,19 @@ public class Block {
                     byte b[]=new byte[is.available()];
                     is.read(b,0,b.length);
                     String errorString = new String(b);
-                    logger.error(errorString);
-                    stdErr.append(errorString);
+                    if(!errorString.isEmpty()){
+                        logger.error(errorString);
+                        stdErr.append(errorString);
+                    }
 
                     is=ps.getInputStream();
                     b=new byte[is.available()];
                     is.read(b,0,b.length);
                     String outputString = new String(b);
-                    logger.info(outputString);
-                    stdOut.append(outputString);
+                    if(!outputString.isEmpty()){
+                        logger.info(outputString);
+                        stdOut.append(outputString);
+                    }
 
                     FileUtils.deleteQuietly(inputFile);
 
@@ -310,9 +314,9 @@ public class Block {
                             }
                         }
                     }
-//                    else{
-//                        throw new Exception("Output file does not exist");
-//                    }
+                    else{
+                        throw new Exception("Output file does not exist");
+                    }
 
 
                 }
