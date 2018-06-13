@@ -34,6 +34,10 @@ public class Point {
         this.label = label;
     }
 
+    public Point(Coordinate coordinate) {
+        this.coordinate = coordinate;
+    }
+
     public Coordinate getCoordinate() {
         return coordinate;
     }

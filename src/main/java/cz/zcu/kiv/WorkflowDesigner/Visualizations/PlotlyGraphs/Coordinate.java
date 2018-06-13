@@ -28,6 +28,17 @@ package cz.zcu.kiv.WorkflowDesigner.Visualizations.PlotlyGraphs;
 public class Coordinate {
     Double x,y,z;
 
+    public Coordinate(Double x, Double y) {
+        this.x = x;
+        this.y = y;
+    }
+
+    public Coordinate(Double x, Double y, Double z) {
+        this.x = x;
+        this.y = y;
+        this.z = z;
+    }
+
     public Double getX() {
         return x;
     }

@@ -31,14 +31,14 @@ import org.json.JSONObject;
 import java.util.List;
 
 public class Graph {
-    String name;
     List<Trace>traces;
+    Layout layout;
 
     public JSONObject toJSON(){
         JSONObject jsonObject = new JSONObject();
-        jsonObject.put("name",getName());
         JSONArray traces = getTracesJSONArray();
         jsonObject.put("traces",traces);
+        jsonObject.put("layout",getLayout().toJSON());
         return jsonObject;
     }
 
@@ -50,13 +50,6 @@ public class Graph {
         return traces;
     }
 
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
 
     public List<Trace> getTraces() {
         return traces;
@@ -64,5 +57,13 @@ public class Graph {
 
     public void setTraces(List<Trace> traces) {
         this.traces = traces;
+    }
+
+    public Layout getLayout() {
+        return layout;
+    }
+
+    public void setLayout(Layout layout) {
+        this.layout = layout;
     }
 }

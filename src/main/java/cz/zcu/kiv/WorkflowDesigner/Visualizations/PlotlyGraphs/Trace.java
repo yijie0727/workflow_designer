@@ -80,6 +80,9 @@ public class Trace {
         if(getTraceMode()!=null)
             jsonObject.put("mode",getTraceMode());
 
+        if(getName()!=null)
+            jsonObject.put("name",getName());
+
         return jsonObject;
     }
 
