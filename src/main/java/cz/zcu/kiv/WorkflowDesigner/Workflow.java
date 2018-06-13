@@ -1,6 +1,7 @@
 package cz.zcu.kiv.WorkflowDesigner;
 
 import cz.zcu.kiv.WorkflowDesigner.Annotations.BlockType;
+import cz.zcu.kiv.WorkflowDesigner.Visualizations.PlotlyGraphs.Graph;
 import cz.zcu.kiv.WorkflowDesigner.Visualizations.Table;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.logging.Log;
@@ -295,26 +296,41 @@ public class Workflow {
                         error=true;
                     }
                     String resultString;
-
+                    JSONObject jsonObject = new JSONObject();
                     if(output==null){
-                        resultString="";
+                        resultString = "";
                     }
                     else if (output.getClass().equals(String.class)){
-                        resultString=(String)output;
+                        jsonObject.put("type","STRING");
+                        jsonObject.put("output",output);
+                        resultString = jsonObject.toString();
                     }
                     else if (output.getClass().equals(File.class)){
                         File file = (File) output;
                         String destinationFileName="file_"+new Date().getTime()+"_"+file.getName();
                         FileUtils.moveFile(file,new File(outputFolder+File.separator+destinationFileName));
-                        resultString="<a href=\"rest/workflow/file/"+destinationFileName+"\">"+file.getName()+"</a>";
+                        jsonObject.put("type","FILE");
+                        jsonObject.put("output","<a href=\"rest/workflow/file/"+destinationFileName+"\">"+file.getName()+"</a>");
+                        resultString = jsonObject.toString();
                     }
                     else if (output.getClass().equals(Table.class)){
                         Table table=(Table)output;
-                        resultString=table.getHTML();
-
+                        jsonObject.put("type","TABLE");
+                        jsonObject.put("output",table.getHTML());
+                        resultString = jsonObject.toString();
                     }
-                    else
-                        resultString=output.toString();
+                    else if (output.getClass().equals(Graph.class)){
+                        Graph graph=(Graph)output;
+                        jsonObject.put("type","GRAPH");
+                        jsonObject.put("output",graph.toJSON().toString());
+                        resultString = jsonObject.toString();
+                    }
+                    else{
+                        jsonObject.put("type","GRAPH");
+                        jsonObject.put("output",output.toString());
+                        resultString=jsonObject.toString();
+                    }
+
 
                     for(int i=0;i<blocksArray.length();i++){
                         JSONObject block=blocksArray.getJSONObject(i);
@@ -332,7 +348,10 @@ public class Workflow {
 
         }
 
-        logger.info("Workflow Execution complete");
+        if(!error)
+            logger.info("Workflow Execution completed successfully!");
+        else
+            logger.error("Workflow Execution failed!");
         return blocksArray;
     }
 

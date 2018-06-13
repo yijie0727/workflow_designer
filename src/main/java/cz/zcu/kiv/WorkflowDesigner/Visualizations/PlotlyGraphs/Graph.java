@@ -20,9 +20,9 @@ package cz.zcu.kiv.WorkflowDesigner.Visualizations.PlotlyGraphs;
  *
  ***********************************************************************************************************************
  *
- * ScatterPlot2D, 2018/13/06 12:40 Joey Pinto
+ * Graph, 2018/13/06 12:40 Joey Pinto
  *
- * This class hosts the data structure for a 2-dimensional scatter plot
+ * This class hosts the data structure for a plot
  **********************************************************************************************************************/
 
 import org.json.JSONArray;
@@ -30,7 +30,7 @@ import org.json.JSONObject;
 
 import java.util.List;
 
-public class ScatterPlot2D {
+public class Graph {
     String name;
     List<Trace>traces;
 
