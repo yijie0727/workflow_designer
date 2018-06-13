@@ -1,4 +1,7 @@
 package cz.zcu.kiv.WorkflowDesigner.Visualizations.PlotlyGraphs;
+
+import java.io.Serializable;
+
 /***********************************************************************************************************************
  *
  * This file is part of the Workflow Designer project
@@ -25,7 +28,7 @@ package cz.zcu.kiv.WorkflowDesigner.Visualizations.PlotlyGraphs;
  * This class hosts the data structure for a point on a graph
  **********************************************************************************************************************/
 
-public class Point {
+public class Point implements Serializable {
     Coordinate coordinate;
     String label;
 

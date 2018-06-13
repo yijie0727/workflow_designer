@@ -3,7 +3,9 @@ package cz.zcu.kiv.WorkflowDesigner.Visualizations.PlotlyGraphs;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-public class Axis {
+import java.io.Serializable;
+
+public class Axis implements Serializable {
     double min,max;
 
     public double getMin() {

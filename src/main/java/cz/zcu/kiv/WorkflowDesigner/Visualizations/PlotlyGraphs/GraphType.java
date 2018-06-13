@@ -1,4 +1,7 @@
 package cz.zcu.kiv.WorkflowDesigner.Visualizations.PlotlyGraphs;
+
+import java.io.Serializable;
+
 /***********************************************************************************************************************
  *
  * This file is part of the Workflow Designer project
@@ -25,7 +28,7 @@ package cz.zcu.kiv.WorkflowDesigner.Visualizations.PlotlyGraphs;
  * This class hosts the graph type constants
  **********************************************************************************************************************/
 
-public class GraphType {
+public class GraphType implements Serializable {
     String type;
 
     public GraphType(String type) {

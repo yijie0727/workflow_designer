@@ -1,4 +1,7 @@
 package cz.zcu.kiv.WorkflowDesigner.Visualizations.PlotlyGraphs;
+
+import java.io.Serializable;
+
 /***********************************************************************************************************************
  *
  * This file is part of the Workflow Designer project
@@ -25,7 +28,7 @@ package cz.zcu.kiv.WorkflowDesigner.Visualizations.PlotlyGraphs;
  * This class hosts the constants for the trace mode
  **********************************************************************************************************************/
 
-public class TraceMode {
+public class TraceMode implements Serializable {
     String mode;
 
     public TraceMode(String mode) {

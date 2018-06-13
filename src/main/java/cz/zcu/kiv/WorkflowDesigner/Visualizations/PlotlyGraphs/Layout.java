@@ -3,7 +3,9 @@ package cz.zcu.kiv.WorkflowDesigner.Visualizations.PlotlyGraphs;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-public class Layout {
+import java.io.Serializable;
+
+public class Layout implements Serializable {
     String title;
     Axis xaxis;
     Axis yaxis;

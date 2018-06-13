@@ -1,4 +1,7 @@
 package cz.zcu.kiv.WorkflowDesigner.Visualizations.PlotlyGraphs;
+
+import java.io.Serializable;
+
 /***********************************************************************************************************************
  *
  * This file is part of the Workflow Designer project
@@ -25,7 +28,7 @@ package cz.zcu.kiv.WorkflowDesigner.Visualizations.PlotlyGraphs;
  * This class hosts the data structure for a coordinate
  **********************************************************************************************************************/
 
-public class Coordinate {
+public class Coordinate implements Serializable {
     Double x,y,z;
 
     public Coordinate(Double x, Double y) {

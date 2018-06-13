@@ -28,9 +28,10 @@ package cz.zcu.kiv.WorkflowDesigner.Visualizations.PlotlyGraphs;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.io.Serializable;
 import java.util.List;
 
-public class Graph {
+public class Graph implements Serializable {
     List<Trace>traces;
     Layout layout;
 
@@ -38,7 +39,8 @@ public class Graph {
         JSONObject jsonObject = new JSONObject();
         JSONArray traces = getTracesJSONArray();
         jsonObject.put("traces",traces);
-        jsonObject.put("layout",getLayout().toJSON());
+        if(getLayout()!=null)
+            jsonObject.put("layout",layout.toJSON());
         return jsonObject;
     }
 

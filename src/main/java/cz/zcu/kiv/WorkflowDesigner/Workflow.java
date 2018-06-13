@@ -295,47 +295,45 @@ public class Workflow {
                     catch(Exception e){
                         error=true;
                     }
-                    String resultString;
                     JSONObject jsonObject = new JSONObject();
                     if(output==null){
-                        resultString = "";
+                        jsonObject = null;
                     }
                     else if (output.getClass().equals(String.class)){
                         jsonObject.put("type","STRING");
-                        jsonObject.put("output",output);
-                        resultString = jsonObject.toString();
+                        jsonObject.put("value",output);
                     }
                     else if (output.getClass().equals(File.class)){
                         File file = (File) output;
                         String destinationFileName="file_"+new Date().getTime()+"_"+file.getName();
                         FileUtils.moveFile(file,new File(outputFolder+File.separator+destinationFileName));
                         jsonObject.put("type","FILE");
-                        jsonObject.put("output","<a href=\"rest/workflow/file/"+destinationFileName+"\">"+file.getName()+"</a>");
-                        resultString = jsonObject.toString();
+                        JSONObject fileObject=new JSONObject();
+                        fileObject.put("title",file.getName());
+                        fileObject.put("filename",destinationFileName);
+                        jsonObject.put("value",fileObject);
                     }
                     else if (output.getClass().equals(Table.class)){
                         Table table=(Table)output;
                         jsonObject.put("type","TABLE");
-                        jsonObject.put("output",table.getHTML());
-                        resultString = jsonObject.toString();
+                        jsonObject.put("value",table.getHTML());
                     }
                     else if (output.getClass().equals(Graph.class)){
                         Graph graph=(Graph)output;
                         jsonObject.put("type","GRAPH");
-                        jsonObject.put("output",graph.toJSON().toString());
-                        resultString = jsonObject.toString();
+                        jsonObject.put("value",graph.toJSON());
                     }
                     else{
-                        jsonObject.put("type","GRAPH");
-                        jsonObject.put("output",output.toString());
-                        resultString=jsonObject.toString();
+                        jsonObject.put("type","");
+                        jsonObject.put("value",output.toString());
                     }
 
 
                     for(int i=0;i<blocksArray.length();i++){
                         JSONObject block=blocksArray.getJSONObject(i);
                         if(block.getInt("id")==waitBlockId){
-                            block.put("output",resultString);
+                            if(jsonObject!=null)
+                            block.put("output",jsonObject);
                             block.put("stdout",stdOutBuilder.toString());
                             block.put("stderr",stdErrBuilder.toString());
                             break;

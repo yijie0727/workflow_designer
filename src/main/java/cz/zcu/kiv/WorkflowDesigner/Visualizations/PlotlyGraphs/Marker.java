@@ -29,7 +29,9 @@ package cz.zcu.kiv.WorkflowDesigner.Visualizations.PlotlyGraphs;
 
 import org.json.JSONObject;
 
-public class Marker {
+import java.io.Serializable;
+
+public class Marker implements Serializable {
     Double size;
 
     public Double getSize() {

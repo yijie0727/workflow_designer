@@ -27,10 +27,12 @@ package cz.zcu.kiv.WorkflowDesigner.Visualizations.PlotlyGraphs;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
+
+import java.io.Serializable;
 import java.util.List;
 
 
-public class Trace {
+public class Trace implements Serializable {
     List<Point> points;
     TraceMode traceMode;
     GraphType graphType;
@@ -75,10 +77,10 @@ public class Trace {
             jsonObject.put("marker",getMarker().toJSON());
 
         if(getGraphType()!=null)
-            jsonObject.put("type",getGraphType());
+            jsonObject.put("type",getGraphType().getType());
 
         if(getTraceMode()!=null)
-            jsonObject.put("mode",getTraceMode());
+            jsonObject.put("mode",getTraceMode().getMode());
 
         if(getName()!=null)
             jsonObject.put("name",getName());
