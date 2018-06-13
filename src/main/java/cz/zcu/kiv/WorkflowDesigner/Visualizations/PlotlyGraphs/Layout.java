@@ -5,8 +5,10 @@ import org.json.JSONObject;
 
 public class Layout {
     String title;
+    Axis xaxis;
+    Axis yaxis;
 
-    double xAxisMin,xAxisMax,yAxisMin,yAxisMax;
+
 
     public String getTitle() {
         return title;
@@ -16,43 +18,27 @@ public class Layout {
         this.title = title;
     }
 
-    public double getxAxisMin() {
-        return xAxisMin;
+    public Axis getXaxis() {
+        return xaxis;
     }
 
-    public void setxAxisMin(double xAxisMin) {
-        this.xAxisMin = xAxisMin;
+    public void setXaxis(Axis xaxis) {
+        this.xaxis = xaxis;
     }
 
-    public double getxAxisMax() {
-        return xAxisMax;
+    public Axis getYaxis() {
+        return yaxis;
     }
 
-    public void setxAxisMax(double xAxisMax) {
-        this.xAxisMax = xAxisMax;
-    }
-
-    public double getyAxisMin() {
-        return yAxisMin;
-    }
-
-    public void setyAxisMin(double yAxisMin) {
-        this.yAxisMin = yAxisMin;
-    }
-
-    public double getyAxisMax() {
-        return yAxisMax;
-    }
-
-    public void setyAxisMax(double yAxisMax) {
-        this.yAxisMax = yAxisMax;
+    public void setYaxis(Axis yaxis) {
+        this.yaxis = yaxis;
     }
 
     public JSONObject toJSON(){
         JSONObject jsonObject = new JSONObject();
         jsonObject.put("title",getTitle());
-        jsonObject.put("xaxis",new JSONArray(new double[]{getxAxisMin(),getxAxisMax()}));
-        jsonObject.put("yaxis",new JSONArray(new double[]{getyAxisMin(),getyAxisMax()}));
+        jsonObject.put("xaxis",getXaxis().toJSON());
+        jsonObject.put("yaxis",getYaxis().toJSON());
         return jsonObject;
     };
 }
