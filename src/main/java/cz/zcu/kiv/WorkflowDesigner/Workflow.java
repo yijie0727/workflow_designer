@@ -1,6 +1,7 @@
 package cz.zcu.kiv.WorkflowDesigner;
 
 import cz.zcu.kiv.WorkflowDesigner.Annotations.BlockType;
+import cz.zcu.kiv.WorkflowDesigner.Visualizations.Table;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -9,11 +10,9 @@ import org.json.JSONObject;
 import org.reflections.Reflections;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationTargetException;
-import java.nio.charset.Charset;
 import java.util.*;
 
 /***********************************************************************************************************************

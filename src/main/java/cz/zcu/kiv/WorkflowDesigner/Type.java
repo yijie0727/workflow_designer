@@ -28,4 +28,8 @@ public class Type {
     public static final String NUMBER = "NUMBER";
 
     public static final String STRING = "STRING";
+
+    public static final String FILE = "FILE";
+
+    public static final String OBJECT = "OBJECT";
 }

@@ -1,7 +1,6 @@
-package cz.zcu.kiv.WorkflowDesigner;
+package cz.zcu.kiv.WorkflowDesigner.Visualizations;
 
 import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.List;
 
 /***********************************************************************************************************************
@@ -31,6 +30,7 @@ import java.util.List;
  **********************************************************************************************************************/
 
 public class Table implements Serializable {
+    private String caption;
     private List<String> columnHeaders;
     private List<String> rowHeaders;
     private List<List<String>>rows;
@@ -59,6 +59,14 @@ public class Table implements Serializable {
         this.rows = rows;
     }
 
+    public String getCaption() {
+        return caption;
+    }
+
+    public void setCaption(String caption) {
+        this.caption = caption;
+    }
+
     /**
      * getHTML -Joey Pinto
      * @return An HTML String representing the table data
@@ -66,6 +74,11 @@ public class Table implements Serializable {
     public String getHTML(){
         StringBuilder html=new StringBuilder();
         html.append("<table border=\"1\">\n");
+
+        if(caption!=null&&!caption.isEmpty()){
+            html.append("<caption>"+getCaption()+"</caption>");
+        }
+
         boolean hasColumnHeaders = getColumnHeaders().size()>0;
         boolean hasRowHeaders = getRowHeaders().size()>0;
         if(hasColumnHeaders){
@@ -92,4 +105,5 @@ public class Table implements Serializable {
         html.append("</table>");
         return html.toString();
     }
+
 }
