@@ -79,14 +79,14 @@ public class Table implements Serializable {
             html.append("<caption>"+getCaption()+"</caption>");
         }
 
-        boolean hasColumnHeaders = getColumnHeaders().size()>0;
-        boolean hasRowHeaders = getRowHeaders().size()>0;
+        boolean hasColumnHeaders = getColumnHeaders()!=null&&getColumnHeaders().size()>0;
+        boolean hasRowHeaders = getRowHeaders()!=null&&getRowHeaders().size()>0;
         if(hasColumnHeaders){
             html.append("<tr>");
             if(hasRowHeaders){
                 html.append("<th></th>");
             }
-            for(String header:columnHeaders){
+            for(String header:getColumnHeaders()){
                 html.append("<th>"+header+"</th>");
             }
             html.append("</tr>\n");
