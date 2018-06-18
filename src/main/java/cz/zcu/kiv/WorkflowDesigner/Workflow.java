@@ -44,6 +44,7 @@ import java.util.*;
 public class Workflow {
 
     private String jarDirectory;
+    private String remoteDirectory;
     private ClassLoader classLoader;
     private Map<Class,String>moduleSource;
     private String module;
@@ -52,16 +53,18 @@ public class Workflow {
 
     private static Log logger = LogFactory.getLog(Workflow.class);
 
-    public Workflow( ClassLoader classLoader, Map<Class, String>moduleSource, String jarDirectory){
+    public Workflow( ClassLoader classLoader, Map<Class, String>moduleSource, String jarDirectory, String remoteDirectory){
         this.classLoader = classLoader;
         this.moduleSource = moduleSource;
         this.jarDirectory = jarDirectory;
+        this.remoteDirectory = remoteDirectory;
     }
 
-    public Workflow( ClassLoader classLoader, String module, String jarDirectory){
+    public Workflow( ClassLoader classLoader, String module, String jarDirectory, String remoteDirectory){
         this.classLoader = classLoader;
         this.module = module;
-        this.jarDirectory =jarDirectory;
+        this.jarDirectory = jarDirectory;
+        this.remoteDirectory = remoteDirectory;
     }
 
     /**
@@ -205,21 +208,30 @@ public class Workflow {
      */
     public List<Integer> populateWaitList(JSONArray edgesArray, Map<Integer,Block>blocks){
         List<Integer>wait=new ArrayList<>();
-        for(int i=0;i<edgesArray.length();i++) {
-            JSONObject edgeObject = edgesArray.getJSONObject(i);
-            Block block1 = blocks.get(edgeObject.getInt("block1"));
-            Block block2 = blocks.get(edgeObject.getInt("block2"));
-            if(!block1.isProcessed()){
-                if(block1.getInput()==null||block1.getInput().size()==0){
-                    wait.add(edgeObject.getInt("block1"));
+        for(Integer blockId:blocks.keySet()){
+            Block current=blocks.get(blockId);
+            if(current.isProcessed())continue;
+            if(current.getInput()==null||current.getInput().isEmpty()){
+                wait.add(blockId);
+                continue;
+            }
+            boolean readyFlag=true;
+            for(int i=0;i<edgesArray.length();i++) {
+                JSONObject edgeObject = edgesArray.getJSONObject(i);
+                int block1Id=edgeObject.getInt("block1");
+                int block2Id=edgeObject.getInt("block2");
+                Block block1 = blocks.get(block1Id);
+                Block block2 = blocks.get(block2Id);
+
+                if(blockId==block2Id && !block1.isProcessed()){
+                    readyFlag=false;
                 }
             }
-            if(!block2.isProcessed()){
-                if (block1.isProcessed() && !block2.isProcessed()) {
-                    wait.add(edgeObject.getInt("block2"));
-                }
+            if(readyFlag){
+                wait.add(blockId);
             }
         }
+
         logger.info("Wait list has "+wait.size()+" blocks");
         return wait;
     }
@@ -384,5 +396,13 @@ public class Workflow {
 
     public void setJarDirectory(String jarDirectory) {
         this.jarDirectory = jarDirectory;
+    }
+
+    public String getRemoteDirectory() {
+        return remoteDirectory;
+    }
+
+    public void setRemoteDirectory(String remoteDirectory) {
+        this.remoteDirectory = remoteDirectory;
     }
 }

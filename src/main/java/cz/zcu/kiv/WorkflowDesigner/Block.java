@@ -95,10 +95,16 @@ public class Block {
                     if (blockProperty != null) {
                         if(blockProperty.name().equals(key)){
                             properties.put(blockProperty.name(), new Property(blockProperty.name(), blockProperty.type(), blockProperty.defaultValue()));
-                            if(f.getType().equals(int.class))
-                                f.set(context,(int) Double.parseDouble(values.getString(key)));
-                            else if(f.getType().equals(double.class))
-                                f.set(context,Double.parseDouble(values.getString(key)));
+                            if(f.getType().equals(int.class)||f.getType().equals(Integer.class))
+                                f.set(context, values.getInt(key));
+                            else if(f.getType().equals(double.class)||f.getType().equals(Double.class))
+                                f.set(context,values.getDouble(key));
+                            else if(f.getType().equals(boolean.class)||f.getType().equals(Boolean.class))
+                                f.set(context,values.getBoolean(key));
+                            else if(f.getType().equals(boolean.class)||f.getType().equals(Boolean.class))
+                                f.set(context,values.getBoolean(key));
+                            else if(f.getType().equals(File.class))
+                                f.set(context,new File(workflow.getRemoteDirectory()+File.separator+values.getString(key)));
                             else f.set(context, f.getType().cast(values.getString(key)));
                             break;
                         }
@@ -246,7 +252,10 @@ public class Block {
 
             BlockProperty blockProperty = f.getAnnotation(BlockProperty.class);
             if (blockProperty != null) {
-                blockData.getProperties().put(blockProperty.name(),f.get(context));
+                if(blockProperty.type().equals(Type.FILE)){
+                    blockData.getProperties().put(blockProperty.name(),new File(workflow.getRemoteDirectory()+File.separator+f.get(context)));
+                }
+                else blockData.getProperties().put(blockProperty.name(),f.get(context));
             }
         }
 

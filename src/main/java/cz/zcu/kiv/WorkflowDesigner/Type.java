@@ -31,5 +31,7 @@ public class Type {
 
     public static final String FILE = "FILE";
 
+    public static final String BOOLEAN = "BOOLEAN";
+
     public static final String OBJECT = "OBJECT";
 }
