@@ -52,6 +52,7 @@ public class WorkflowDesignerTest {
         String json = FileUtils.readFileToString(new File("test_data/test.json"),Charset.defaultCharset());
         JSONObject jsonObject = new JSONObject(json);
         JSONArray jsonArray = new Workflow(ClassLoader.getSystemClassLoader(), ":test",null,"").execute(jsonObject,"test_data");
+        assert jsonArray.getJSONObject(0).getJSONObject("output").getInt("value")==15;
         assert jsonArray !=null;
         assert jsonArray.length() == 3;
     }
@@ -64,6 +65,7 @@ public class WorkflowDesignerTest {
         JSONArray jsonArray = new Workflow(ClassLoader.getSystemClassLoader(), ":test",null,"").execute(jsonObject,"test_data");
         assert jsonArray !=null;
         assert jsonArray.length() == 3;
+        assert jsonArray.getJSONObject(1).getJSONObject("output").getInt("value")==8;
     }
 
 }

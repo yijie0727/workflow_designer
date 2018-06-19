@@ -366,7 +366,7 @@ public class Block {
                     BlockInput blockInput = f.getAnnotation(BlockInput.class);
                     if (blockInput != null) {
                         if(blockInput.name().equals(destinationData.getName())){
-                            if(components.size()==1){
+                            if(!blockInput.type().endsWith("[]")){
                                 Object val=components.get(0);
                                 f.set(context,val);
                                 blockData.getInput().put(destinationData.getName(),val);
