@@ -8,14 +8,13 @@ import org.json.JSONObject;
 import org.reflections.Reflections;
 import java.io.*;
 import java.lang.annotation.Annotation;
+import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.charset.Charset;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -191,61 +190,119 @@ public class Block {
         return blockJs;
     }
 
-    public Object processBlock(Map<Integer, Block> blocks, Map<String, Integer> sourceBlocks, Map<String, String> sourceParams, StringBuilder stdOut, StringBuilder stdErr) throws Exception {
-        Object output = null;
+
+
+    public Object processBlock(Map<Integer,Block> blocks, Map<String,InputField> fields, StringBuilder stdOut, StringBuilder stdErr) throws Exception {
+       Object output;
         BlockData blockData=new BlockData(getName());
 
         logger.info("Processing a "+getName()+" block");
 
-        if(getInput()!=null&&getInput().size()>0) {
-            for (String key : getInput().keySet()) {
-                Data destinationData=getInput().get(key);
-                Block sourceBlock = blocks.get(sourceBlocks.get(key));
+        assignInputs(blocks,fields,blockData);
 
-                if(sourceBlock==null){
-                    logger.error("Could not find the source block for the input "+key+" for a "+getName()+" block");
-                    throw new FieldMismatchException(key,"source");
-                }
+        if(isJarExecutable() && workflow.getJarDirectory()!=null){
+            output = executeAsJar(blockData,stdOut,stdErr);
+        }
+        else{
+            logger.info("Executing "+getName()+" block natively");
+            try {
+                output = process();
+            }
+            catch (Exception e){
+                e.printStackTrace();
+                stdErr.append(org.apache.commons.lang3.exception.ExceptionUtils.getStackTrace(e));
+                logger.error("Error executing Block natively",e);
+                throw e;
+            }
+        }
 
-                Map<String, Data> source = sourceBlock.getOutput();
-                Data sourceData=null;
+        setProcessed(true);
+        logger.info("Execution of "+getName()+ " block completed successfully");
+        return output;
+    }
 
-                if(sourceParams.containsKey(key)){
-                    sourceData=source.get(sourceParams.get(key));
-                }
+    private Object executeAsJar(BlockData blockData, StringBuilder stdOut, StringBuilder stdErr) throws Exception {
 
-                Object value = null;
+        Object output;
+        logger.info("Executing "+getName()+" as a JAR");
+        try {
+            String fileName = "obj_" + new Date().getTime() ;
+            File inputFile=new File(workflow.getJarDirectory()+File.separator+fileName+".in");
+            File outputFile =new File(workflow.getJarDirectory()+File.separator+fileName+".out");
 
-                if(sourceData==null) {
-                    throw new FieldMismatchException(key,"source");
-                }
+            //Serialize and write BlockData object to a file
+            FileOutputStream fos = new FileOutputStream(inputFile);
+            ObjectOutputStream oos = new ObjectOutputStream(fos);
+            oos.writeObject(blockData);
+            oos.close();
 
-                for (Field f: sourceBlock.getContext().getClass().getDeclaredFields()) {
-                    f.setAccessible(true);
+            File jarDirectory = new File(workflow.getJarDirectory());
+            jarDirectory.mkdirs();
+            String jarFilePath = jarDirectory.getAbsolutePath()+File.separator+getModule().split(":")[0];
+            File jarFile = new File(jarFilePath);
+            String[]args=new String[]{"java", "-cp",jarFile.getAbsolutePath() ,"cz.zcu.kiv.WorkflowDesigner.Block",inputFile.getAbsolutePath(),outputFile.getAbsolutePath(),getModule().split(":")[1]};
+            ProcessBuilder pb = new ProcessBuilder(args);
 
-                    BlockOutput blockOutput = f.getAnnotation(BlockOutput.class);
-                    if (blockOutput != null){
-                        if(blockOutput.name().equals(sourceData.getName())) {
-                            value = f.get(sourceBlock.getContext());
-                            break;
-                        }
-                    }
-                }
+            logger.info("Executing jar file "+jarFilePath);
+            File stdOutFile = new File("std_output.log");
+            pb.redirectOutput(stdOutFile);
+            File stdErrFile = new File("std_error.log");
+            pb.redirectError(stdErrFile);
+            Process ps = pb.start();
+            ps.waitFor();
+            stdOut.append(FileUtils.readFileToString(stdOutFile,Charset.defaultCharset()));
+            stdErr.append(FileUtils.readFileToString(stdErrFile,Charset.defaultCharset()));
+            InputStream is=ps.getErrorStream();
+            byte b[]=new byte[is.available()];
+            is.read(b,0,b.length);
+            String errorString = new String(b);
+            if(!errorString.isEmpty()){
+                logger.error(errorString);
+                stdErr.append(errorString);
+            }
 
+            is=ps.getInputStream();
+            b=new byte[is.available()];
+            is.read(b,0,b.length);
+            String outputString = new String(b);
+            if(!outputString.isEmpty()){
+                logger.info(outputString);
+                stdOut.append(outputString);
+            }
+
+            FileUtils.deleteQuietly(inputFile);
+
+            if(outputFile.exists()){
+                FileInputStream fis = new FileInputStream(outputFile);
+                ObjectInputStream ois = new ObjectInputStream(fis);
+                blockData = (BlockData) ois.readObject();
+                ois.close();
+                output=blockData.getProcessOutput();
+                FileUtils.deleteQuietly(outputFile);
                 for (Field f: context.getClass().getDeclaredFields()) {
                     f.setAccessible(true);
-
-                    BlockInput blockInput = f.getAnnotation(BlockInput.class);
-                    if (blockInput != null) {
-                        if(blockInput.name().equals(destinationData.getName())){
-                            f.set(context,value);
-                            blockData.getInput().put(destinationData.getName(),value);
-                            break;
-                        }
+                    BlockOutput blockOutput = f.getAnnotation(BlockOutput.class);
+                    if (blockOutput != null) {
+                        f.set(context,blockData.getOutput().get(blockOutput.name()));
                     }
                 }
             }
+            else{
+                throw new Exception("Output file does not exist");
+            }
+
+
         }
+        catch (Exception e) {
+            e.printStackTrace();
+            stdErr.append(org.apache.commons.lang3.exception.ExceptionUtils.getStackTrace(e));
+            logger.error("Error executing Jar file", e);
+            throw e;
+        }
+        return output;
+    }
+
+    private void assignInputs(Map<Integer,Block> blocks, Map<String,InputField> fields, BlockData blockData) throws FieldMismatchException, IllegalAccessException, ClassNotFoundException {
 
         for (Field f: context.getClass().getDeclaredFields()) {
             f.setAccessible(true);
@@ -259,99 +316,78 @@ public class Block {
             }
         }
 
-            if(isJarExecutable()&&workflow.getJarDirectory()!=null){
-                logger.info("Executing "+getName()+" as a JAR");
-                try {
-                    String fileName = "obj_" + new Date().getTime() ;
-                    File inputFile=new File(workflow.getJarDirectory()+File.separator+fileName+".in");
-                    File outputFile =new File(workflow.getJarDirectory()+File.separator+fileName+".out");
+        if(getInput()!=null&&getInput().size()>0) {
 
-                    //Serialize and write BlockData object to a file
-                    FileOutputStream fos = new FileOutputStream(inputFile);
-                    ObjectOutputStream oos = new ObjectOutputStream(fos);
-                    oos.writeObject(blockData);
-                    oos.close();
+            for (String key : getInput().keySet()) {
+                InputField field = fields.get(key);
+                Data destinationData=getInput().get(key);
 
-                    File jarDirectory = new File(workflow.getJarDirectory());
-                    jarDirectory.mkdirs();
-                    String jarFilePath = jarDirectory.getAbsolutePath()+File.separator+getModule().split(":")[0];
-                    File jarFile = new File(jarFilePath);
-                    String[]args=new String[]{"java", "-cp",jarFile.getAbsolutePath() ,"cz.zcu.kiv.WorkflowDesigner.Block",inputFile.getAbsolutePath(),outputFile.getAbsolutePath(),getModule().split(":")[1]};
-                    ProcessBuilder pb = new ProcessBuilder(args);
+                int inputCardinality = field.getSourceParam().size();
+                List<Object> components=new ArrayList<>();
 
-                    logger.info("Executing jar file "+jarFilePath);
-                    File stdOutFile = new File("std_output.log");
-                    pb.redirectOutput(stdOutFile);
-                    File stdErrFile = new File("std_error.log");
-                    pb.redirectError(stdErrFile);
-                    Process ps = pb.start();
-                    ps.waitFor();
-                    stdOut.append(FileUtils.readFileToString(stdOutFile,Charset.defaultCharset()));
-                    stdErr.append(FileUtils.readFileToString(stdErrFile,Charset.defaultCharset()));
-                    InputStream is=ps.getErrorStream();
-                    byte b[]=new byte[is.available()];
-                    is.read(b,0,b.length);
-                    String errorString = new String(b);
-                    if(!errorString.isEmpty()){
-                        logger.error(errorString);
-                        stdErr.append(errorString);
+                for(int i=0;i<inputCardinality;i++){
+                    Object value = null;
+                    String sourceParam = field.getSourceParam().get(i);
+                    int sourceBlockId = field.getSourceBlock().get(i);
+                    Block sourceBlock = blocks.get(sourceBlockId);
+                    if(field.getSourceBlock()==null){
+                        logger.error("Could not find the source block for the input "+key+" for a "+getName()+" block");
+                        throw new FieldMismatchException(key,"source");
+                    }
+                    Map<String, Data> source = sourceBlock.getOutput();
+                    Data sourceData=null;
+
+                    if(source.containsKey(sourceParam)){
+                        sourceData=source.get(sourceParam);
+                    }
+                    if(sourceData==null) {
+                        throw new FieldMismatchException(key,"source");
                     }
 
-                    is=ps.getInputStream();
-                    b=new byte[is.available()];
-                    is.read(b,0,b.length);
-                    String outputString = new String(b);
-                    if(!outputString.isEmpty()){
-                        logger.info(outputString);
-                        stdOut.append(outputString);
-                    }
+                    for (Field f: sourceBlock.getContext().getClass().getDeclaredFields()) {
+                        f.setAccessible(true);
 
-                    FileUtils.deleteQuietly(inputFile);
-
-                    if(outputFile.exists()){
-                        FileInputStream fis = new FileInputStream(outputFile);
-                        ObjectInputStream ois = new ObjectInputStream(fis);
-                        blockData = (BlockData) ois.readObject();
-                        ois.close();
-                        output=blockData.getProcessOutput();
-                        FileUtils.deleteQuietly(outputFile);
-                        for (Field f: context.getClass().getDeclaredFields()) {
-                            f.setAccessible(true);
-                            BlockOutput blockOutput = f.getAnnotation(BlockOutput.class);
-                            if (blockOutput != null) {
-                                f.set(context,blockData.getOutput().get(blockOutput.name()));
+                        BlockOutput blockOutput = f.getAnnotation(BlockOutput.class);
+                        if (blockOutput != null){
+                            if(blockOutput.name().equals(sourceData.getName())) {
+                                value = f.get(sourceBlock.getContext());
+                                break;
                             }
                         }
                     }
-                    else{
-                        throw new Exception("Output file does not exist");
+
+                    components.add(value);
+
+                }
+
+                for (Field f: context.getClass().getDeclaredFields()) {
+                    f.setAccessible(true);
+
+                    BlockInput blockInput = f.getAnnotation(BlockInput.class);
+                    if (blockInput != null) {
+                        if(blockInput.name().equals(destinationData.getName())){
+                            if(components.size()==1){
+                                Object val=components.get(0);
+                                f.set(context,val);
+                                blockData.getInput().put(destinationData.getName(),val);
+                            }
+                            else{
+                                if(f.getType().isArray()){
+                                    throw new IllegalAccessException("Arrays not supported");
+                                }
+                                f.set(context,f.getType().cast(components));
+                                blockData.getInput().put(destinationData.getName(),components);
+                            }
+
+                            break;
+                        }
                     }
-
-
                 }
-                catch (Exception e) {
-                    e.printStackTrace();
-                    stdErr.append(org.apache.commons.lang3.exception.ExceptionUtils.getStackTrace(e));
-                    logger.error("Error executing Jar file", e);
-                    throw e;
-                }
+
             }
-            else{
-                logger.info("Executing "+getName()+" block natively");
-                try {
-                    output = process();
-                }
-                catch (Exception e){
-                    e.printStackTrace();
-                    stdErr.append(org.apache.commons.lang3.exception.ExceptionUtils.getStackTrace(e));
-                    logger.error("Error executing Block natively",e);
-                    throw e;
-                }
-            }
+        }
 
-        setProcessed(true);
-        logger.info("Execution of "+getName()+ " block completed successfully");
-        return output;
+
     }
 
     public Object process() throws InvocationTargetException, IllegalAccessException {

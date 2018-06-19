@@ -271,8 +271,9 @@ public class Workflow {
                 waitBlock = blocks.get(waitBlockId);
 
                 Map<Integer, Block> dependencies = new HashMap<>();
-                Map<String, String> sourceParam = new HashMap<>();
-                Map<String, Integer> sourceBlock = new HashMap<>();
+
+
+                Map<String,InputField>fields=new HashMap<>();
 
                 
                 //Check dependencies of waiting block
@@ -286,7 +287,7 @@ public class Workflow {
                     Block block1 = blocks.get(block1Id);
 
                     //Populate the dependencies into the maps
-                    populateDependencies(block1Id,block1,edgeObject,dependencies,sourceParam,sourceBlock);
+                    populateDependencies(block1Id,block1,edgeObject,dependencies,fields);
 
                     //A dependency is unprocessed so not ready
                     if (!block1.isProcessed()) {
@@ -302,9 +303,10 @@ public class Workflow {
                     //Process the ready block
                     Object output = null;
                     try {
-                        output = waitBlock.processBlock(dependencies, sourceBlock, sourceParam, stdOutBuilder, stdErrBuilder);
+                        output = waitBlock.processBlock(dependencies, fields, stdOutBuilder, stdErrBuilder);
                     }
                     catch(Exception e){
+                        logger.error(e);
                         error=true;
                     }
                     JSONObject jsonObject = new JSONObject();
@@ -365,6 +367,8 @@ public class Workflow {
         return blocksArray;
     }
 
+
+
     /**
      * populateDependencies - Joey Pinto
      *
@@ -374,17 +378,31 @@ public class Workflow {
      * @param block1
      * @param edgeObject
      * @param dependencies
-     * @param sourceParam
-     * @param sourceBlock
+     * @param fields
      */
-    private void populateDependencies(int block1Id, Block block1, JSONObject edgeObject, Map<Integer,Block> dependencies, Map<String,String> sourceParam, Map<String,Integer> sourceBlock) {
+
+    private void populateDependencies(int block1Id, Block block1, JSONObject edgeObject, Map<Integer,Block> dependencies, Map<String,InputField> fields) {
         JSONArray connector1 = edgeObject.getJSONArray("connector1");
         JSONArray connector2 = edgeObject.getJSONArray("connector2");
 
-        for (int k = 0; k < connector1.length(); k++) {
-            sourceParam.put(connector2.getString(k), connector1.getString(k));
-            sourceBlock.put(connector2.getString(k), block1Id);
-        }
+            InputField field;
+            if(fields.containsKey(connector2.getString(0))){
+                field = fields.get(connector2.getString(0));
+
+            }
+            else{
+                field=new InputField();
+                List<String>sourceParams = new ArrayList<>();
+                field.setSourceParam(sourceParams);
+                List<Integer>sourceBlocks = new ArrayList<>();
+                field.setSourceBlock(sourceBlocks);
+                field.setDestinationParam(connector2.getString(0));
+                fields.put(field.getDestinationParam(),field);
+
+            }
+            field.getSourceParam().add(connector1.getString(0));
+            field.getSourceBlock().add(block1Id);
+
 
         dependencies.put(block1Id, block1);
     }

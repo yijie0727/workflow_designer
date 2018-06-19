@@ -16,7 +16,7 @@ public class ArithmeticBlock {
     private int op2=0;
 
     @BlockOutput(name = "Operand3", type = NUMBER, cardinality = ONE_TO_MANY)
-    private static int op3=0;
+    private int op3=0;
 
     @BlockProperty(name ="Operation", type = STRING ,defaultValue = "add")
     private String operation;
@@ -38,9 +38,5 @@ public class ArithmeticBlock {
                 break;
         }
         return String.valueOf(op3);
-    }
-
-    public static int getOp3() {
-        return op3;
     }
 }

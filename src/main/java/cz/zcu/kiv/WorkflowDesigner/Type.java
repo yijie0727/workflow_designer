@@ -27,9 +27,15 @@ package cz.zcu.kiv.WorkflowDesigner;
 public class Type {
     public static final String NUMBER = "NUMBER";
 
+    public static final String NUMBER_ARRAY = "NUMBER[]";
+
     public static final String STRING = "STRING";
 
+    public static final String STRING_ARRAY = "STRING[]";
+
     public static final String FILE = "FILE";
+
+    public static final String FILE_ARAY = "FILE[]";
 
     public static final String BOOLEAN = "BOOLEAN";
 
