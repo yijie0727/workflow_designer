@@ -43,7 +43,7 @@ public class WorkflowDesignerTest {
     @Test
     public void testBlock() throws NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException {
         JSONArray blocksArray=new Workflow(ClassLoader.getSystemClassLoader(),":test",null,"").initializeBlocks();
-        assert blocksArray.length()==3;
+        assert blocksArray.length()==4;
     }
 
     @Test
@@ -68,5 +68,14 @@ public class WorkflowDesignerTest {
         assert jsonArray.getJSONObject(1).getJSONObject("output").getInt("value")==8;
     }
 
+    @Test
+    public void testConcatenate() throws IOException, NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException, FieldMismatchException {
+        String json="{\"edges\":[],\"blocks\":[{\"id\":1,\"x\":-192,\"y\":-116,\"type\":\"CONCATENATE\",\"module\":\"commons-1.0-jar-with-dependencies.jar:cz.zcu.kiv.commons\",\"values\":{\"Strings\":[\"A\",\"B\"]}}]}";
+        JSONObject jsonObject = new JSONObject(json);
+        JSONArray jsonArray = new Workflow(ClassLoader.getSystemClassLoader(), ":test",null,"").execute(jsonObject,"test_data");
+        assert jsonArray !=null;
+        assert jsonArray.length() == 1;
+        assert jsonArray.getJSONObject(0).getJSONObject("output").getString("value").equals("AB");
+    }
 }
 

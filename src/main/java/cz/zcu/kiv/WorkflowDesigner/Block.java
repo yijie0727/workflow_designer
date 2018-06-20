@@ -94,17 +94,18 @@ public class Block {
                     if (blockProperty != null) {
                         if(blockProperty.name().equals(key)){
                             properties.put(blockProperty.name(), new Property(blockProperty.name(), blockProperty.type(), blockProperty.defaultValue()));
-                            if(f.getType().equals(int.class)||f.getType().equals(Integer.class))
-                                f.set(context, values.getInt(key));
-                            else if(f.getType().equals(double.class)||f.getType().equals(Double.class))
-                                f.set(context,values.getDouble(key));
-                            else if(f.getType().equals(boolean.class)||f.getType().equals(Boolean.class))
-                                f.set(context,values.getBoolean(key));
-                            else if(f.getType().equals(boolean.class)||f.getType().equals(Boolean.class))
-                                f.set(context,values.getBoolean(key));
-                            else if(f.getType().equals(File.class))
-                                f.set(context,new File(workflow.getRemoteDirectory()+File.separator+values.getString(key)));
-                            else f.set(context, f.getType().cast(values.getString(key)));
+                            if(blockProperty.type().endsWith("[]")){
+                                if(f.getType().isArray()){
+                                    throw new IllegalAccessException("Arrays Not supported, Use List instead");
+                                }
+                                List<Object>components=new ArrayList<>();
+                                JSONArray array=values.getJSONArray(key);
+                                for(int i=0;i<array.length();i++){
+                                    components.add(array.get(i));
+                                }
+                                f.set(context,components);
+                            }
+                            else f.set(context,getFieldFromJSON(f,values, key));
                             break;
                         }
                     }
@@ -114,6 +115,19 @@ public class Block {
 
         logger.info("Instantiated "+getName()+" block from Workflow");
 
+    }
+
+    private Object getFieldFromJSON(Field f, JSONObject values, String key) {
+        if(f.getType().equals(int.class)||f.getType().equals(Integer.class))
+            return values.getInt(key);
+        else if(f.getType().equals(double.class)||f.getType().equals(Double.class))
+            return values.getDouble(key);
+        else if(f.getType().equals(boolean.class)||f.getType().equals(Boolean.class))
+            return values.getBoolean(key);
+        else if(f.getType().equals(File.class))
+            return new File(workflow.getRemoteDirectory()+File.separator+values.getString(key));
+
+        return f.getType().cast(values.getString(key));
     }
 
     public Block(Object context, Workflow workflow){
@@ -373,7 +387,7 @@ public class Block {
                             }
                             else{
                                 if(f.getType().isArray()){
-                                    throw new IllegalAccessException("Arrays not supported");
+                                    throw new IllegalAccessException("Arrays not supported, Use Lists Instead");
                                 }
                                 f.set(context,f.getType().cast(components));
                                 blockData.getInput().put(destinationData.getName(),components);
@@ -452,12 +466,19 @@ public class Block {
 
             BlockInput blockInput = f.getAnnotation(BlockInput.class);
             if (blockInput != null){
-                input.put(blockInput.name(),new Data(blockInput.name(),blockInput.type(),blockInput.cardinality()));
+                String cardinality="";
+                if(blockInput.type().endsWith("[]")){
+                    cardinality=WorkflowCardinality.MANY_TO_MANY;
+                }
+                else{
+                    cardinality=WorkflowCardinality.ONE_TO_ONE;
+                }
+                input.put(blockInput.name(),new Data(blockInput.name(),blockInput.type(),cardinality));
             }
 
             BlockOutput blockOutput = f.getAnnotation(BlockOutput.class);
             if (blockOutput != null){
-                output.put(blockOutput.name(),new Data(blockOutput.name(),blockOutput.type(),blockOutput.cardinality()));
+                output.put(blockOutput.name(),new Data(blockOutput.name(),blockOutput.type(),WorkflowCardinality.MANY_TO_MANY));
             }
         }
         logger.info("Initialized "+getName()+" block from annotations");

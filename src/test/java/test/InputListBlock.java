@@ -7,12 +7,11 @@ import cz.zcu.kiv.WorkflowDesigner.Annotations.BlockType;
 import java.util.List;
 
 import static cz.zcu.kiv.WorkflowDesigner.Type.NUMBER_ARRAY;
-import static cz.zcu.kiv.WorkflowDesigner.WorkflowCardinality.ONE_TO_MANY;
 
 @BlockType(type ="SUMMATION", family = "MATH")
-public class SummationBlock {
+public class InputListBlock {
 
-    @BlockInput(name = "Operand1", type = NUMBER_ARRAY, cardinality = ONE_TO_MANY)
+    @BlockInput(name = "Operand1", type = NUMBER_ARRAY)
     private List<Integer> op;
 
     @BlockExecute

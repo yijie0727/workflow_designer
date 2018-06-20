@@ -12,6 +12,4 @@ public @interface BlockOutput {
     String name();
 
     String type();
-
-    String cardinality();
 }

@@ -12,7 +12,7 @@ public class ConstantBlock {
     @BlockProperty(name = "Value", type = NUMBER, defaultValue = "0")
     private int val=7;
 
-    @BlockOutput(name = "Operand", type = NUMBER, cardinality = ONE_TO_ONE)
+    @BlockOutput(name = "Operand", type = NUMBER)
     private int op=0;
 
     @BlockExecute
