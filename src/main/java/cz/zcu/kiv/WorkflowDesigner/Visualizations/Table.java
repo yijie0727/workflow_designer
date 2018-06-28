@@ -1,5 +1,8 @@
 package cz.zcu.kiv.WorkflowDesigner.Visualizations;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
 import java.io.Serializable;
 import java.util.List;
 
@@ -104,6 +107,38 @@ public class Table implements Serializable {
         }
         html.append("</table>");
         return html.toString();
+    }
+
+    public JSONObject toJSON(){
+        JSONObject table = new JSONObject();
+        JSONArray data=new JSONArray();
+
+        boolean hasColumnHeaders = getColumnHeaders()!=null&&getColumnHeaders().size()>0;
+        boolean hasRowHeaders = getRowHeaders()!=null&&getRowHeaders().size()>0;
+
+        if(hasColumnHeaders){
+            JSONArray headerRow = new JSONArray();
+            if(hasRowHeaders){
+                headerRow.put("");
+            }
+            for(String header:getColumnHeaders()){
+                headerRow.put(header);
+            }
+            data.put(headerRow);
+        }
+
+        for(int i=0;i<rows.size();i++){
+            JSONArray row = new JSONArray();
+            if(hasRowHeaders){
+                row.put(getRowHeaders().get(i));
+            }
+            for(String col:rows.get(i)){
+                row.put(col);
+            }
+            data.put(row);
+        }
+        table.put("data",data);
+        return table;
     }
 
 }

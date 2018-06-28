@@ -8,10 +8,7 @@ import org.json.JSONObject;
 import org.reflections.Reflections;
 import java.io.*;
 import java.lang.annotation.Annotation;
-import java.lang.reflect.Array;
-import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
+import java.lang.reflect.*;
 import java.nio.charset.Charset;
 import java.util.*;
 
@@ -100,8 +97,13 @@ public class Block {
                                 }
                                 List<Object>components=new ArrayList<>();
                                 JSONArray array=values.getJSONArray(key);
+                                ParameterizedType listType = (ParameterizedType) f.getGenericType();
+                                Class<?> listClass = (Class<?>) listType.getActualTypeArguments()[0];
                                 for(int i=0;i<array.length();i++){
-                                    components.add(array.get(i));
+                                    if(listClass.equals(File.class)){
+                                        components.add(new File(workflow.getRemoteDirectory()+File.separator+array.get(i)));
+                                    }
+                                    else components.add(array.get(i));
                                 }
                                 f.set(context,components);
                             }

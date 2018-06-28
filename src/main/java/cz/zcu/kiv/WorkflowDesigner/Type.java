@@ -35,7 +35,7 @@ public class Type {
 
     public static final String FILE = "FILE";
 
-    public static final String FILE_ARAY = "FILE[]";
+    public static final String FILE_ARRAY = "FILE[]";
 
     public static final String BOOLEAN = "BOOLEAN";
 

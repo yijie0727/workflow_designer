@@ -330,7 +330,7 @@ public class Workflow {
                     else if (output.getClass().equals(Table.class)){
                         Table table=(Table)output;
                         jsonObject.put("type","TABLE");
-                        jsonObject.put("value",table.getHTML());
+                        jsonObject.put("value",table.toJSON());
                     }
                     else if (output.getClass().equals(Graph.class)){
                         Graph graph=(Graph)output;
