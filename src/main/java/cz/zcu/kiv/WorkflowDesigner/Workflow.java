@@ -246,7 +246,7 @@ public class Workflow {
      * @param jObject
      * @throws Exception
      */
-    public JSONArray execute(JSONObject jObject, String outputFolder) throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException, FieldMismatchException, IOException {
+    public JSONArray execute(JSONObject jObject, String outputFolder, String workflowOutputFile) throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException, FieldMismatchException, IOException {
 
         logger.info("Starting execution of Workflow");
         JSONArray blocksArray = jObject.getJSONArray("blocks");
@@ -362,7 +362,11 @@ public class Workflow {
                             break;
                         }
                     }
-
+                    //Save Present state of output to file
+                    if(workflowOutputFile!=null){
+                        File workflowOutput=new File(workflowOutputFile);
+                        FileUtils.writeStringToFile(workflowOutput,blocksArray.toString(4),Charset.defaultCharset());
+                    }
                 }
                 if(error)break;
             }
