@@ -14,6 +14,7 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationTargetException;
+import java.nio.charset.Charset;
 import java.util.*;
 
 /***********************************************************************************************************************
@@ -331,6 +332,14 @@ public class Workflow {
                         Table table=(Table)output;
                         jsonObject.put("type","TABLE");
                         jsonObject.put("value",table.toJSON());
+                        File file =File.createTempFile("temp_",".csv");
+                        FileUtils.writeStringToFile(file,table.toCSV(),Charset.defaultCharset());
+                        String destinationFileName="table_"+new Date().getTime()+".csv";
+                        FileUtils.moveFile(file,new File(outputFolder+File.separator+destinationFileName));
+                        JSONObject fileObject=new JSONObject();
+                        fileObject.put("title",destinationFileName);
+                        fileObject.put("filename",destinationFileName);
+                        jsonObject.put("value",fileObject);
                     }
                     else if (output.getClass().equals(Graph.class)){
                         Graph graph=(Graph)output;

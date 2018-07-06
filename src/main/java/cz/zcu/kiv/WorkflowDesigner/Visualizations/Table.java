@@ -141,4 +141,17 @@ public class Table implements Serializable {
         return table;
     }
 
+    public String toCSV() {
+        JSONArray rows=toJSON().getJSONArray("data");
+        StringBuilder csv=new StringBuilder();
+        for(int i=0;i<rows.length();i++){
+            JSONArray columns=rows.getJSONArray(i);
+            for(int j=0;j<columns.length();j++){
+                csv.append(columns.get(j));
+                if(j<columns.length()-1)csv.append(",");
+                else csv.append("\n");
+            }
+        }
+        return csv.toString();
+    }
 }
