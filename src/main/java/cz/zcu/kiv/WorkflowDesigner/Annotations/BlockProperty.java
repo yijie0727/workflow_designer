@@ -13,4 +13,6 @@ public @interface BlockProperty {
     String type();
 
     String defaultValue() default "";
+
+    String description() default  "";
 }

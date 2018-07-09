@@ -111,12 +111,14 @@ public class Workflow {
                 Block block= new Block(blockType.newInstance(),this);
                 Annotation annotation = blockType.getAnnotation(BlockType.class);
                 Class<? extends Annotation> type = annotation.annotationType();
-                String blockTypeName=(String)type.getDeclaredMethod("type").invoke(annotation, (Object[])null);
-                String blockTypeFamily=(String)type.getDeclaredMethod("family").invoke(annotation, (Object[])null);
+                String blockTypeName = (String)type.getDeclaredMethod("type").invoke(annotation, (Object[])null);
+                String blockTypeFamily = (String)type.getDeclaredMethod("family").invoke(annotation, (Object[])null);
                 Boolean jarExecutable = (Boolean) type.getDeclaredMethod("runAsJar").invoke(annotation, (Object[])null);
+                String description = (String)type.getDeclaredMethod("description").invoke(annotation, (Object[])null);
                 block.setName(blockTypeName);
                 block.setFamily(blockTypeFamily);
                 block.setJarExecutable(jarExecutable);
+                block.setDescription(description);
                 if(moduleSource!=null)
                     block.setModule(moduleSource.get(blockType));
                 else{

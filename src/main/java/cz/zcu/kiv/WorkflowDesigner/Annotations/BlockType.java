@@ -9,5 +9,7 @@ public @interface BlockType {
 
     String family();
 
+    String description() default "";
+
     boolean runAsJar() default false;
 }

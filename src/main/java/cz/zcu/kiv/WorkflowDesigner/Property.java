@@ -30,11 +30,13 @@ public class Property {
     private String name;
     private String type;
     private String defaultValue;
+    private String description;
 
-    public Property(String name, String type, String defaultValue) {
+    public Property(String name, String type, String defaultValue, String description) {
         this.name = name;
         this.type = type;
         this.defaultValue = defaultValue;
+        this.description = description;
     }
 
     public String getName() {
@@ -61,4 +63,11 @@ public class Property {
         this.defaultValue = defaultValue;
     }
 
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
 }

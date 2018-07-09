@@ -47,6 +47,7 @@ public class Block {
     private String name;
     private String family;
     private String module;
+    private String description;
     private boolean jarExecutable;
     private Map<String, Data> input;
     private Map<String, Data> output;
@@ -90,7 +91,7 @@ public class Block {
                     BlockProperty blockProperty = f.getAnnotation(BlockProperty.class);
                     if (blockProperty != null) {
                         if(blockProperty.name().equals(key)){
-                            properties.put(blockProperty.name(), new Property(blockProperty.name(), blockProperty.type(), blockProperty.defaultValue()));
+                            properties.put(blockProperty.name(), new Property(blockProperty.name(), blockProperty.type(), blockProperty.defaultValue(), blockProperty.description()));
                             if(blockProperty.type().endsWith("[]")){
                                 if(f.getType().isArray()){
                                     throw new IllegalAccessException("Arrays Not supported, Use List instead");
@@ -162,11 +163,20 @@ public class Block {
         this.module = module;
     }
 
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
     public JSONObject toJSON(){
         JSONObject blockJs=new JSONObject();
         blockJs.put("name",getName());
         blockJs.put("family", getFamily());
         blockJs.put("module", getModule());
+        blockJs.put("description", getDescription());
         JSONArray fields=new JSONArray();
         for(String key:properties.keySet()){
             Property property=properties.get(key);
@@ -175,6 +185,7 @@ public class Block {
             field.put("type",property.getType());
             field.put("defaultValue",property.getDefaultValue());
             field.put("attrs","editable");
+            field.put("description",property.getDescription());
             fields.put(field);
         }
 
@@ -463,7 +474,7 @@ public class Block {
 
             BlockProperty blockProperty = f.getAnnotation(BlockProperty.class);
             if (blockProperty != null){
-                properties.put(blockProperty.name(),new Property(blockProperty.name(),blockProperty.type(),blockProperty.defaultValue()));
+                properties.put(blockProperty.name(),new Property(blockProperty.name(),blockProperty.type(),blockProperty.defaultValue(), blockProperty.description()));
             }
 
             BlockInput blockInput = f.getAnnotation(BlockInput.class);

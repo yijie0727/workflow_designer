@@ -6,7 +6,7 @@
 
     <groupId>cz.zcu.kiv</groupId>
     <artifactId>workflow_designer</artifactId>
-    <version>1.12</version>
+    <version>1.13</version>
     <build>
 
         <plugins>
