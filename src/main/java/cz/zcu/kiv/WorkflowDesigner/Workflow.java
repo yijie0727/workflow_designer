@@ -359,6 +359,7 @@ public class Workflow {
                             block.put("output",jsonObject);
                             block.put("stdout",stdOutBuilder.toString());
                             block.put("stderr",stdErrBuilder.toString());
+                            block.put("completed",true);
                             break;
                         }
                     }
