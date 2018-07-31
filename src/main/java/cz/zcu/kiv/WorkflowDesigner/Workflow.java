@@ -300,6 +300,7 @@ public class Workflow {
                 }
 
                 if (ready) {
+                    JSONObject block=getBlockById(blocksArray,waitBlockId);
                     logger.info("Processing block with ID "+waitBlockId);
                     StringBuilder stdOutBuilder =new StringBuilder();
                     StringBuilder stdErrBuilder =new StringBuilder();
@@ -307,10 +308,12 @@ public class Workflow {
                     Object output = null;
                     try {
                         output = waitBlock.processBlock(dependencies, fields, stdOutBuilder, stdErrBuilder);
+                        block.put("error",false);
                     }
                     catch(Exception e){
                         logger.error(e);
                         error=true;
+                        block.put("error",true);
                     }
                     JSONObject jsonObject = new JSONObject();
                     if(output==null){
@@ -361,18 +364,12 @@ public class Workflow {
                         jsonObject.put("value",output.toString());
                     }
 
+                    if (jsonObject != null)
+                        block.put("output", jsonObject);
+                    block.put("stdout", stdOutBuilder.toString());
+                    block.put("stderr", stdErrBuilder.toString());
+                    block.put("completed", true);
 
-                    for(int i=0;i<blocksArray.length();i++){
-                        JSONObject block=blocksArray.getJSONObject(i);
-                        if(block.getInt("id")==waitBlockId){
-                            if(jsonObject!=null)
-                            block.put("output",jsonObject);
-                            block.put("stdout",stdOutBuilder.toString());
-                            block.put("stderr",stdErrBuilder.toString());
-                            block.put("completed",true);
-                            break;
-                        }
-                    }
                     //Save Present state of output to file
                     if(workflowOutputFile!=null){
                         File workflowOutput=new File(workflowOutputFile);
@@ -429,6 +426,16 @@ public class Workflow {
 
 
         dependencies.put(block1Id, block1);
+    }
+
+    public static JSONObject getBlockById(JSONArray blocksArray, int waitBlockId){
+        for(int i=0;i<blocksArray.length();i++){
+            JSONObject block=blocksArray.getJSONObject(i);
+            if(block.getInt("id")==waitBlockId){
+                return block;
+            }
+        }
+        return null;
     }
 
 

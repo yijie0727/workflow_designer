@@ -3,6 +3,7 @@ package cz.zcu.kiv.WorkflowDesigner;
 import cz.zcu.kiv.WorkflowDesigner.Annotations.*;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.SerializationUtils;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.reflections.Reflections;
@@ -237,7 +238,10 @@ public class Block {
             }
             catch (Exception e){
                 e.printStackTrace();
-                stdErr.append(org.apache.commons.lang3.exception.ExceptionUtils.getStackTrace(e));
+                stdErr.append(ExceptionUtils.getRootCauseMessage(e)+" \n");
+                for(String trace:ExceptionUtils.getRootCauseStackTrace(e)){
+                    stdErr.append(trace+" \n");
+                }
                 logger.error("Error executing Block natively",e);
                 throw e;
             }
@@ -347,6 +351,10 @@ public class Block {
 
             for (String key : getInput().keySet()) {
                 InputField field = fields.get(key);
+                if(field==null){
+                    //Missing input field
+                    continue;
+                }
                 Data destinationData=getInput().get(key);
 
                 int inputCardinality = field.getSourceParam().size();
