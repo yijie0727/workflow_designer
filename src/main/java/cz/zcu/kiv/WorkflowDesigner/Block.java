@@ -122,16 +122,23 @@ public class Block {
     }
 
     private Object getFieldFromJSON(Field f, JSONObject values, String key) {
-        if(f.getType().equals(int.class)||f.getType().equals(Integer.class))
-            return values.getInt(key);
-        else if(f.getType().equals(double.class)||f.getType().equals(Double.class))
-            return values.getDouble(key);
-        else if(f.getType().equals(boolean.class)||f.getType().equals(Boolean.class))
-            return values.getBoolean(key);
-        else if(f.getType().equals(File.class))
-            return new File(workflow.getRemoteDirectory()+File.separator+values.getString(key));
+        try {
+            if (f.getType().equals(int.class) || f.getType().equals(Integer.class))
+                return values.getInt(key);
+            else if (f.getType().equals(double.class) || f.getType().equals(Double.class))
+                return values.getDouble(key);
+            else if (f.getType().equals(boolean.class) || f.getType().equals(Boolean.class))
+                return values.getBoolean(key);
+            else if (f.getType().equals(File.class))
+                return new File(workflow.getRemoteDirectory() + File.separator + values.getString(key));
 
-        return f.getType().cast(values.getString(key));
+            return f.getType().cast(values.getString(key));
+        }
+        catch (Exception e){
+            //Unpredictable result when reading from a field
+            logger.error(e);
+            return null;
+        }
     }
 
     public Block(Object context, Workflow workflow){
