@@ -54,7 +54,7 @@ public class WorkflowDesignerTest {
         File outputFile = File.createTempFile("testJSONArithmetic",".json");
         outputFile.deleteOnExit();
         JSONArray jsonArray = new Workflow(ClassLoader.getSystemClassLoader(), ":test",null,"").execute(jsonObject,"test_data",outputFile.getAbsolutePath());
-        System.out.println(jsonArray);
+
         assert jsonArray !=null;
         assert jsonArray.getJSONObject(0).getJSONObject("output").getInt("value")==15;
         assert jsonArray.length() == 3;
