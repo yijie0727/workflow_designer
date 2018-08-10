@@ -53,7 +53,10 @@ public class Block {
     private Map<String, Data> input;
     private Map<String, Data> output;
     private Map<String,Property> properties;
+
+    //Actual Object instance maintained as context
     private Object context;
+
     private static Log logger = LogFactory.getLog(Block.class);
 
     public Object getContext() {
@@ -64,12 +67,16 @@ public class Block {
         this.context = context;
     }
 
-    //Temporary variables
     private boolean processed=false;
 
+    /**
+     * @param blockObject - Initialize a Block object from a JSON representation
+     */
     public void fromJSON(JSONObject blockObject) throws NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException, FieldMismatchException {
         this.name = blockObject.getString("type");
         this.module = blockObject.getString("module");
+
+        //Get block definition from workflow
         Block block = workflow.getDefinition(this.name);
 
         if(block==null){
@@ -85,6 +92,8 @@ public class Block {
 
 
         JSONObject values = blockObject.getJSONObject("values");
+
+        //Map properties to object parameters
         for(String key:this.properties.keySet()){
             if(values.has(key)){
                 for (Field f: context.getClass().getDeclaredFields()) {
@@ -93,8 +102,13 @@ public class Block {
                     if (blockProperty != null) {
                         if(blockProperty.name().equals(key)){
                             properties.put(blockProperty.name(), new Property(blockProperty.name(), blockProperty.type(), blockProperty.defaultValue(), blockProperty.description()));
+
+                            //Assign object attributes from properties
                             if(blockProperty.type().endsWith("[]")){
+
+                                //Dealing with List properties
                                 if(f.getType().isArray()){
+                                    //Unsupported by reflection
                                     throw new IllegalAccessException("Arrays Not supported, Use List instead");
                                 }
                                 List<Object>components=new ArrayList<>();
@@ -121,6 +135,13 @@ public class Block {
 
     }
 
+    /**
+     * Get value of actual property field
+     * @param f - Relfection field
+     * @param values - JSON object containing values assigned to properties
+     * @param key - Key to get Field
+     * @return Actual object instance
+     */
     private Object getFieldFromJSON(Field f, JSONObject values, String key) {
         try {
             if (f.getType().equals(int.class) || f.getType().equals(Integer.class))
@@ -130,6 +151,7 @@ public class Block {
             else if (f.getType().equals(boolean.class) || f.getType().equals(Boolean.class))
                 return values.getBoolean(key);
             else if (f.getType().equals(File.class))
+                //If type is file, instance of the actual file is passed rather than just the location
                 return new File(workflow.getRemoteDirectory() + File.separator + values.getString(key));
 
             return f.getType().cast(values.getString(key));
@@ -141,6 +163,11 @@ public class Block {
         }
     }
 
+    /**
+     * Block constructor
+     * @param context - Object instance
+     * @param workflow - Workflow instance
+     */
     public Block(Object context, Workflow workflow){
         this.context = context;
         this.workflow = workflow;
@@ -179,6 +206,9 @@ public class Block {
         this.description = description;
     }
 
+    /**
+     * Convert Block to JSON for front-end
+     */
     public JSONObject toJSON(){
         JSONObject blockJs=new JSONObject();
         blockJs.put("name",getName());
@@ -226,21 +256,32 @@ public class Block {
     }
 
 
-
+    /**
+     * Process a block and return value returned by BlockExecute block
+     * @param blocks Map of blocks
+     * @param fields Mapping of fieldName to actual field
+     * @param stdOut Standard Output stream builder
+     * @param stdErr Error Stream builder
+     * @return Object returned by BlockExecute method
+     * @throws Exception
+     */
     public Object processBlock(Map<Integer,Block> blocks, Map<String,InputField> fields, StringBuilder stdOut, StringBuilder stdErr) throws Exception {
        Object output;
         BlockData blockData=new BlockData(getName());
 
         logger.info("Processing a "+getName()+" block");
 
+        //Assign inputs to the instance
         assignInputs(blocks,fields,blockData);
 
         if(isJarExecutable() && workflow.getJarDirectory()!=null){
+            //Execute block as an external JAR file
             output = executeAsJar(blockData,stdOut,stdErr);
         }
         else{
             logger.info("Executing "+getName()+" block natively");
             try {
+                //Execute block natively in the current class loader
                 output = process();
             }
             catch (Exception e){
@@ -249,7 +290,7 @@ public class Block {
                 for(String trace:ExceptionUtils.getRootCauseStackTrace(e)){
                     stdErr.append(trace+" \n");
                 }
-                logger.error("Error executing Block natively",e);
+                logger.error("Error executing "+getName()+" Block natively",e);
                 throw e;
             }
         }
@@ -259,6 +300,15 @@ public class Block {
         return output;
     }
 
+    /**
+     * Execute block externally as a JAR
+     *
+     * @param blockData Serializable BlockData model representing all the data needed by a block to execute
+     * @param stdOut Standard Output Stream
+     * @param stdErr Standard Error Stream
+     * @return output returned by BlockExecute Method
+     * @throws Exception when output file is not created
+     */
     private Object executeAsJar(BlockData blockData, StringBuilder stdOut, StringBuilder stdErr) throws Exception {
 
         Object output;
@@ -278,9 +328,12 @@ public class Block {
             jarDirectory.mkdirs();
             String jarFilePath = jarDirectory.getAbsolutePath()+File.separator+getModule().split(":")[0];
             File jarFile = new File(jarFilePath);
+
+            //Calling jar file externally with entry point at the Block's main method
             String[]args=new String[]{"java", "-cp",jarFile.getAbsolutePath() ,"cz.zcu.kiv.WorkflowDesigner.Block",inputFile.getAbsolutePath(),outputFile.getAbsolutePath(),getModule().split(":")[1]};
             ProcessBuilder pb = new ProcessBuilder(args);
 
+            //Store output and error streams to files
             logger.info("Executing jar file "+jarFilePath);
             File stdOutFile = new File("std_output.log");
             pb.redirectOutput(stdOutFile);
@@ -340,8 +393,17 @@ public class Block {
         return output;
     }
 
+    /**
+     * Assign Inputs - Maps output fields of previous block to input fields of next block and initializes properties
+     * @param blocks
+     * @param fields
+     * @param blockData
+     * @throws FieldMismatchException
+     * @throws IllegalAccessException
+     * @throws ClassNotFoundException
+     */
     private void assignInputs(Map<Integer,Block> blocks, Map<String,InputField> fields, BlockData blockData) throws FieldMismatchException, IllegalAccessException, ClassNotFoundException {
-
+        //Assign properties to object instance
         for (Field f: context.getClass().getDeclaredFields()) {
             f.setAccessible(true);
 
@@ -356,12 +418,15 @@ public class Block {
 
         if(getInput()!=null&&getInput().size()>0) {
 
+            //Assigning inputs
+
             for (String key : getInput().keySet()) {
                 InputField field = fields.get(key);
                 if(field==null){
                     //Missing input field
                     continue;
                 }
+                //Getting destination for data
                 Data destinationData=getInput().get(key);
 
                 int inputCardinality = field.getSourceParam().size();
@@ -402,6 +467,8 @@ public class Block {
 
                 }
 
+
+                //Assigning outputs to destination
                 for (Field f: context.getClass().getDeclaredFields()) {
                     f.setAccessible(true);
 
@@ -432,6 +499,10 @@ public class Block {
 
     }
 
+    /**
+     * process - execute a method annotated by Block Execute annotation
+     * @return whatever object is returned by the method
+     */
     public Object process() throws InvocationTargetException, IllegalAccessException {
         Object output = null;
         for(Method method:context.getClass().getDeclaredMethods()){
@@ -476,6 +547,9 @@ public class Block {
         this.processed = processed;
     }
 
+    /**
+     * Initialize a Block from a class
+     */
     public void initialize(){
         if(getProperties()==null)
             setProperties(new HashMap<String,Property>());

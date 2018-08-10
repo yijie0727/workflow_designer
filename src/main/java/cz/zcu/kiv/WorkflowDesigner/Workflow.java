@@ -54,6 +54,14 @@ public class Workflow {
 
     private static Log logger = LogFactory.getLog(Workflow.class);
 
+
+    /**
+     * Workflow Constructor
+     * @param classLoader - classLoader to load classes into
+     * @param moduleSource Mapping of Class Block to actual module Name
+     * @param jarDirectory - Directory where JAR files are saved (for runAsJar)
+     * @param remoteDirectory - Directory to load files from
+     */
     public Workflow( ClassLoader classLoader, Map<Class, String>moduleSource, String jarDirectory, String remoteDirectory){
         this.classLoader = classLoader;
         this.moduleSource = moduleSource;
@@ -61,6 +69,13 @@ public class Workflow {
         this.remoteDirectory = remoteDirectory;
     }
 
+    /**
+     * Workflow Constructor
+     * @param classLoader - classLoader to load classes into
+     * @param module - Module name in format jarName:packageName
+     * @param jarDirectory - Directory where JAR files are saved (for runAsJar)
+     * @param remoteDirectory - Directory to load files from
+     */
     public Workflow( ClassLoader classLoader, String module, String jarDirectory, String remoteDirectory){
         this.classLoader = classLoader;
         this.module = module;
@@ -101,16 +116,21 @@ public class Workflow {
             for(String module:modules){
                 packages.add(module.split(":")[1]);
             }
+            // Load classes from packages using reflection
             blockTypes = new Reflections(packages.toArray(new String[packages.size()]),this.classLoader).getTypesAnnotatedWith(BlockType.class);
 
         }
         else
+            //Load classes from specific module
             blockTypes = new Reflections(module.split(":")[1],classLoader).getTypesAnnotatedWith(BlockType.class);
 
         for(Class blockType:blockTypes){
+                //Instantiate block
                 Block block= new Block(blockType.newInstance(),this);
                 Annotation annotation = blockType.getAnnotation(BlockType.class);
                 Class<? extends Annotation> type = annotation.annotationType();
+
+                //Load information from annotations
                 String blockTypeName = (String)type.getDeclaredMethod("type").invoke(annotation, (Object[])null);
                 String blockTypeFamily = (String)type.getDeclaredMethod("family").invoke(annotation, (Object[])null);
                 Boolean jarExecutable = (Boolean) type.getDeclaredMethod("runAsJar").invoke(annotation, (Object[])null);
@@ -119,6 +139,7 @@ public class Workflow {
                 block.setFamily(blockTypeFamily);
                 block.setJarExecutable(jarExecutable);
                 block.setDescription(description);
+
                 if(moduleSource!=null)
                     block.setModule(moduleSource.get(blockType));
                 else{
@@ -205,8 +226,8 @@ public class Workflow {
      * populateWaitList - Joey Pinto
      *
      * Populate wait list of blocks that are unprocessed
-     * @param edgesArray
-     * @param blocks
+     * @param edgesArray - JSON from frontend containing connected edges
+     * @param blocks - Map of block ID to block object
      * @return
      */
     public List<Integer> populateWaitList(JSONArray edgesArray, Map<Integer,Block>blocks){
@@ -224,7 +245,7 @@ public class Workflow {
                 int block1Id=edgeObject.getInt("block1");
                 int block2Id=edgeObject.getInt("block2");
                 Block block1 = blocks.get(block1Id);
-                Block block2 = blocks.get(block2Id);
+//                Block block2 = blocks.get(block2Id);
 
                 if(blockId==block2Id && !block1.isProcessed()){
                     readyFlag=false;
@@ -245,7 +266,9 @@ public class Workflow {
      *
      * process a workflow JSON Object
      *
-     * @param jObject
+     * @param jObject JSON Workflow to be executed
+     * @param outputFolder Folder to save output Files into
+     * @param workflowOutputFile File to constantly update the progress of the workflow
      * @throws Exception
      */
     public JSONArray execute(JSONObject jObject, String outputFolder, String workflowOutputFile) throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException, FieldMismatchException, IOException {
@@ -304,6 +327,7 @@ public class Workflow {
                     logger.info("Processing block with ID "+waitBlockId);
                     StringBuilder stdOutBuilder =new StringBuilder();
                     StringBuilder stdErrBuilder =new StringBuilder();
+
                     //Process the ready block
                     Object output = null;
                     try {
@@ -315,6 +339,8 @@ public class Workflow {
                         error=true;
                         block.put("error",true);
                     }
+
+                    //Assemble the output JSON
                     JSONObject jsonObject = new JSONObject();
                     if(output==null){
                         jsonObject = null;
@@ -395,11 +421,11 @@ public class Workflow {
      *
      * Populate the dependency maps of a block
      *
-     * @param block1Id
-     * @param block1
-     * @param edgeObject
-     * @param dependencies
-     * @param fields
+     * @param block1Id - ID of block to populate dependencies
+     * @param block1 - Block object
+     * @param edgeObject - JSON containg edge definitions
+     * @param dependencies - Map of Blocks that are dependencies
+     * @param fields - Input field Annotations
      */
 
     private void populateDependencies(int block1Id, Block block1, JSONObject edgeObject, Map<Integer,Block> dependencies, Map<String,InputField> fields) {
@@ -428,6 +454,13 @@ public class Workflow {
         dependencies.put(block1Id, block1);
     }
 
+    /**
+     * Get a block from the JSON workflow by id
+     *
+     * @param blocksArray - JSON workflow
+     * @param waitBlockId - Block ID
+     * @return
+     */
     public static JSONObject getBlockById(JSONArray blocksArray, int waitBlockId){
         for(int i=0;i<blocksArray.length();i++){
             JSONObject block=blocksArray.getJSONObject(i);
