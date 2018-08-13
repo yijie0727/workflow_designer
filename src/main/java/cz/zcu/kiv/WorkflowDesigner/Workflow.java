@@ -378,7 +378,7 @@ public class Workflow {
                         jsonObject.put("value",graph.toJSON());
                         File file =File.createTempFile("temp_",".json");
                         FileUtils.writeStringToFile(file,graph.toJSON().toString(4),Charset.defaultCharset());
-                        String destinationFileName="graph_"+new Date().getTime()+".csv";
+                        String destinationFileName="graph_"+new Date().getTime()+".json";
                         FileUtils.moveFile(file,new File(outputFolder+File.separator+destinationFileName));
                         JSONObject fileObject=new JSONObject();
                         fileObject.put("title",destinationFileName);
