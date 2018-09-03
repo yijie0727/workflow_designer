@@ -1,13 +1,16 @@
 package test;
 
 import cz.zcu.kiv.WorkflowDesigner.Annotations.*;
+
+import java.io.Serializable;
+
 import static cz.zcu.kiv.WorkflowDesigner.Type.NUMBER;
 import static cz.zcu.kiv.WorkflowDesigner.Type.STRING;
 import static cz.zcu.kiv.WorkflowDesigner.WorkflowCardinality.ONE_TO_MANY;
 import static cz.zcu.kiv.WorkflowDesigner.WorkflowCardinality.ONE_TO_ONE;
 
 @BlockType(type ="ARITHMETIC", family = "MATH")
-public class ArithmeticBlock {
+public class ArithmeticBlock implements Serializable {
 
     @BlockInput(name = "Operand1", type = NUMBER)
     private int op1=0;

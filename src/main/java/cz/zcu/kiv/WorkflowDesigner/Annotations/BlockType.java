@@ -11,5 +11,5 @@ public @interface BlockType {
 
     String description() default "";
 
-    boolean runAsJar() default false;
+    boolean runAsJar() default true;
 }

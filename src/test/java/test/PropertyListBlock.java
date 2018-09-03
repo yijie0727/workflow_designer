@@ -3,11 +3,13 @@ package test;
 import cz.zcu.kiv.WorkflowDesigner.Annotations.BlockExecute;
 import cz.zcu.kiv.WorkflowDesigner.Annotations.BlockProperty;
 import cz.zcu.kiv.WorkflowDesigner.Annotations.BlockType;
+
+import java.io.Serializable;
 import java.util.List;
 import static cz.zcu.kiv.WorkflowDesigner.Type.STRING_ARRAY;
 
 @BlockType(type ="CONCATENATE", family = "STRING")
-public class PropertyListBlock {
+public class PropertyListBlock implements Serializable {
 
     @BlockProperty(name = "Strings", type = STRING_ARRAY, defaultValue = "")
     private List<String> op;
