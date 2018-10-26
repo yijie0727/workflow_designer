@@ -330,9 +330,12 @@ public class Block {
             File jarFile = new File(jarFilePath);
 
             //Calling jar file externally with entry point at the Block's main method
-            String[]args=new String[]{"java", "-cp",jarFile.getAbsolutePath() ,"cz.zcu.kiv.WorkflowDesigner.Block",inputFile.getAbsolutePath(),outputFile.getAbsolutePath(),getModule().split(":")[1]};
+            String defaultVmArgs = "-Xmx1G";
+            String vmargs = System.getProperty("workflow.designer.vm.args");
+            vmargs = vmargs != null ? vmargs : defaultVmArgs;
+            String[]args=new String[]{"java", vmargs, "-cp",jarFile.getAbsolutePath() ,"cz.zcu.kiv.WorkflowDesigner.Block",inputFile.getAbsolutePath(),outputFile.getAbsolutePath(),getModule().split(":")[1]};
+            logger.info("Passing arguments" + Arrays.toString(args));
             ProcessBuilder pb = new ProcessBuilder(args);
-
             //Store output and error streams to files
             logger.info("Executing jar file "+jarFilePath);
             File stdOutFile = new File("std_output.log");
