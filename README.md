@@ -71,6 +71,11 @@ org.reflections is a significant dependency of this project. Others include depe
 
 Tests are defined in the test package. Tests currently include an example handling basic arithmetic operations.
 
+### Possible Issues
+
+Memory-intensive blocks can cause java heap space error.
+Solution: Set the system property workflow.designer.vm.args=-Xmx4G
+
 ### Copyright
 
  
