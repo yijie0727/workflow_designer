@@ -674,7 +674,10 @@ public class Block {
             fos.close();
         }
         catch (Exception e) {
-            //logger.error(org.apache.commons.lang3.exception.ExceptionUtils.getStackTrace(e));
+            //We need to write error to System.err to
+            //propagate exception to the process that started this block.
+            //This block is usually started in @executeAsJar and std error
+            //output is redirected to propagate exception.
             if(e.getCause() != null)
                 e.getCause().printStackTrace();
             else
