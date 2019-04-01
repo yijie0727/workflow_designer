@@ -266,7 +266,7 @@ public class Block {
      * @throws Exception
      */
     public Object processBlock(Map<Integer,Block> blocks, Map<String,InputField> fields, StringBuilder stdOut, StringBuilder stdErr) throws Exception {
-       Object output;
+        Object output;
         BlockData blockData=new BlockData(getName());
 
         logger.info("Processing a "+getName()+" block");
@@ -345,7 +345,8 @@ public class Block {
             Process ps = pb.start();
             ps.waitFor();
             stdOut.append(FileUtils.readFileToString(stdOutFile,Charset.defaultCharset()));
-            stdErr.append(FileUtils.readFileToString(stdErrFile,Charset.defaultCharset()));
+            String processErr =FileUtils.readFileToString(stdErrFile,Charset.defaultCharset());
+            stdErr.append(processErr);
             InputStream is=ps.getErrorStream();
             byte b[]=new byte[is.available()];
             is.read(b,0,b.length);
@@ -382,10 +383,12 @@ public class Block {
                 }
             }
             else{
-                throw new Exception("Output file does not exist");
+                String err = "Output file does not exist";
+                if(processErr != null && !errorString.isEmpty()){
+                    err = processErr;
+                }
+                throw new Exception(err);
             }
-
-
         }
         catch (Exception e) {
             e.printStackTrace();
@@ -511,8 +514,8 @@ public class Block {
         for(Method method:context.getClass().getDeclaredMethods()){
             method.setAccessible(true);
             if(method.getAnnotation(BlockExecute.class)!=null){
-                    output =  method.invoke(context);
-                    break;
+                output =  method.invoke(context);
+                break;
             }
         }
         return output;
