@@ -384,7 +384,7 @@ public class Block {
             }
             else{
                 String err = "Output file does not exist";
-                if(processErr != null && !errorString.isEmpty()){
+                if(processErr != null && !processErr.isEmpty()){
                     err = processErr;
                 }
                 throw new Exception(err);
@@ -598,8 +598,7 @@ public class Block {
      *
      * @param args 1) serialized input file 2) serialized output file 3) Package Name
      */
-    public static void main(String[] args){
-
+    public static void main(String[] args) {
         try {
             //Reading BlockData object from file
             BlockData blockData = SerializationUtils.deserialize(FileUtils.readFileToByteArray(new File(args[0])));
@@ -673,10 +672,13 @@ public class Block {
             FileOutputStream fos = FileUtils.openOutputStream(new File(args[1]));
             SerializationUtils.serialize(blockData,fos);
             fos.close();
-
         }
-        catch (Exception e){
-            logger.error(org.apache.commons.lang3.exception.ExceptionUtils.getStackTrace(e));
+        catch (Exception e) {
+            //logger.error(org.apache.commons.lang3.exception.ExceptionUtils.getStackTrace(e));
+            if(e.getCause() != null)
+                e.getCause().printStackTrace();
+            else
+                e.printStackTrace();
         }
     }
 
