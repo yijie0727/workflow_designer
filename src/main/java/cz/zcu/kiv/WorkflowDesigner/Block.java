@@ -266,7 +266,7 @@ public class Block {
      * @throws Exception
      */
     public Object processBlock(Map<Integer,Block> blocks, Map<String,InputField> fields, StringBuilder stdOut, StringBuilder stdErr) throws Exception {
-       Object output;
+        Object output;
         BlockData blockData=new BlockData(getName());
 
         logger.info("Processing a "+getName()+" block");
@@ -345,7 +345,8 @@ public class Block {
             Process ps = pb.start();
             ps.waitFor();
             stdOut.append(FileUtils.readFileToString(stdOutFile,Charset.defaultCharset()));
-            stdErr.append(FileUtils.readFileToString(stdErrFile,Charset.defaultCharset()));
+            String processErr =FileUtils.readFileToString(stdErrFile,Charset.defaultCharset());
+            stdErr.append(processErr);
             InputStream is=ps.getErrorStream();
             byte b[]=new byte[is.available()];
             is.read(b,0,b.length);
@@ -382,10 +383,12 @@ public class Block {
                 }
             }
             else{
-                throw new Exception("Output file does not exist");
+                String err = "Output file does not exist";
+                if(processErr != null && !processErr.isEmpty()){
+                    err = processErr;
+                }
+                throw new Exception(err);
             }
-
-
         }
         catch (Exception e) {
             e.printStackTrace();
@@ -511,8 +514,8 @@ public class Block {
         for(Method method:context.getClass().getDeclaredMethods()){
             method.setAccessible(true);
             if(method.getAnnotation(BlockExecute.class)!=null){
-                    output =  method.invoke(context);
-                    break;
+                output =  method.invoke(context);
+                break;
             }
         }
         return output;
@@ -595,8 +598,7 @@ public class Block {
      *
      * @param args 1) serialized input file 2) serialized output file 3) Package Name
      */
-    public static void main(String[] args){
-
+    public static void main(String[] args) {
         try {
             //Reading BlockData object from file
             BlockData blockData = SerializationUtils.deserialize(FileUtils.readFileToByteArray(new File(args[0])));
@@ -670,10 +672,16 @@ public class Block {
             FileOutputStream fos = FileUtils.openOutputStream(new File(args[1]));
             SerializationUtils.serialize(blockData,fos);
             fos.close();
-
         }
-        catch (Exception e){
-            logger.error(org.apache.commons.lang3.exception.ExceptionUtils.getStackTrace(e));
+        catch (Exception e) {
+            //We need to write error to System.err to
+            //propagate exception to the process that started this block.
+            //This block is usually started in @executeAsJar and std error
+            //output is redirected to propagate exception.
+            if(e.getCause() != null)
+                e.getCause().printStackTrace();
+            else
+                e.printStackTrace();
         }
     }
 
