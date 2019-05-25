@@ -209,7 +209,7 @@ public class Workflow {
                 throw new FieldMismatchException(blockObject.getString("type"),"block type");
             }
 
-            //Initialize values from the JSONObject
+            //Initialize values from the JSONObject(initialize Block fields and properties)
             block.fromJSON(blockObject);
 
             //Initialize the block I/O and configurations
@@ -232,21 +232,31 @@ public class Workflow {
      */
     public List<Integer> populateWaitList(JSONArray edgesArray, Map<Integer,Block>blocks){
         List<Integer>wait=new ArrayList<>();
+
+        //fetch a Block in the Map<Integer,Block>blocks
         for(Integer blockId:blocks.keySet()){
             Block current=blocks.get(blockId);
-            if(current.isProcessed())continue;
+            if(current.isProcessed())continue;//TODO 1: Judge the Block status, may be changed in the future
+            //Directly add the Block which only has no inputs(e.g CONSTANT Block only has properties)
             if(current.getInput()==null||current.getInput().isEmpty()){
                 wait.add(blockId);
                 continue;
             }
             boolean readyFlag=true;
+            //For every Block in the blocks Map (every blocks in teh workflow)
+            //we should fetch every edge relationship existing in the json input file
+            //loop the all the edges relationships to check the Block is ready to be executed
             for(int i=0;i<edgesArray.length();i++) {
+                //fetch ith edge relationship between two Blocks
                 JSONObject edgeObject = edgesArray.getJSONObject(i);
                 int block1Id=edgeObject.getInt("block1");
                 int block2Id=edgeObject.getInt("block2");
+                //get the Block which sends its outputs to the second Block
                 Block block1 = blocks.get(block1Id);
 //                Block block2 = blocks.get(block2Id);
 
+                //If the 2nd Block is equal to the Block we are doing now(fetched from Map)
+                //AND If the 1st Block is not already executed(processed)(no available input for 2nd Block)
                 if(blockId==block2Id && !block1.isProcessed()){
                     readyFlag=false;
                 }
@@ -276,7 +286,7 @@ public class Workflow {
         logger.info("Starting execution of Workflow");
         JSONArray blocksArray = jObject.getJSONArray("blocks");
 
-        //Accumulate and index all blocks defined in the workflow
+        //Accumulate and index all blocks defined in the workflow(blocks are already set properties)
         Map<Integer,Block> blocks=indexBlocks(blocksArray);
 
         JSONArray edgesArray = jObject.getJSONArray("edges");
@@ -291,6 +301,7 @@ public class Workflow {
             if(wait.size()==0)break;
 
             //Process wait queue
+            //for every Block in the waitlist
             for (Integer aWait : wait) {
                 boolean ready = true;
                 int waitBlockId = aWait;
@@ -298,15 +309,16 @@ public class Workflow {
 
                 Map<Integer, Block> dependencies = new HashMap<>();
 
-
+                //InputField e.g. => List<String> sourceParam = ["op"], List<Integer>sourceBlock = [1], String destinationParam = op1
                 Map<String,InputField>fields=new HashMap<>();
 
                 
                 //Check dependencies of waiting block
+                //for every edge relationship, update in the loop all the inputs of the Block we want to execute
                 for (int i = 0; i < edgesArray.length(); i++) {
                     JSONObject edgeObject = edgesArray.getJSONObject(i);
 
-                    //Choose only edges that end on block 2
+                    //Choose only edges that end on block 2, want waitBlock to be the 2nd Block(which takes the input) in the edge relationship
                     if (waitBlockId != edgeObject.getInt("block2")) continue;
 
                     int block1Id = edgeObject.getInt("block1");
@@ -315,6 +327,7 @@ public class Workflow {
                     //Populate the dependencies into the maps
                     populateDependencies(block1Id,block1,edgeObject,dependencies,fields);
 
+                    //TODO 4：Why we need check the block1.isProcessed() again? since all the blocks int the waitlist should have a processed predecessor block???
                     //A dependency is unprocessed so not ready
                     if (!block1.isProcessed()) {
                         ready = false;
@@ -322,6 +335,7 @@ public class Workflow {
                     }
                 }
 
+                //Execute!
                 if (ready) {
                     JSONObject block=getBlockById(blocksArray,waitBlockId);
                     logger.info("Processing block with ID "+waitBlockId);
@@ -432,6 +446,8 @@ public class Workflow {
         JSONArray connector1 = edgeObject.getJSONArray("connector1");
         JSONArray connector2 = edgeObject.getJSONArray("connector2");
 
+        //each time we get for example Map<"Operand1", InputField>fields
+        //InputField=> List<String> SourceParam = ["Operand"], List<Integer>sourceBlock = [1], String destinationParam = "Operand1";
             InputField field;
             if(fields.containsKey(connector2.getString(0))){
                 field = fields.get(connector2.getString(0));

@@ -70,6 +70,8 @@ public class Block {
     private boolean processed=false;
 
     /**
+     * set the fields from the workflow definition blocks to the new Block, and set its block properties values
+     * called in Workflow Map<Integer, Block> indexBlocks(blocksArray) ---> called in Workflow JSONArray execute
      * @param blockObject - Initialize a Block object from a JSON representation
      */
     public void fromJSON(JSONObject blockObject) throws NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException, FieldMismatchException {
@@ -123,6 +125,10 @@ public class Block {
                                 }
                                 f.set(context,components);
                             }
+                            //set the value of the Block properties:
+                            //f is the property field we reflect from the Block (the field of the key of 3rd paramater)
+                            //values is the properties in JSONObject format
+                            //key is the name of one of the properties in values we want to get now in String format
                             else f.set(context,getFieldFromJSON(f,values, key));
                             break;
                         }
@@ -272,6 +278,7 @@ public class Block {
         logger.info("Processing a "+getName()+" block");
 
         //Assign inputs to the instance
+        //Set the value of the executing Block's BlockData class(for serializing purpose)
         assignInputs(blocks,fields,blockData);
 
         if(isJarExecutable() && workflow.getJarDirectory()!=null){
@@ -315,7 +322,7 @@ public class Block {
         logger.info("Executing "+getName()+" as a JAR");
         try {
             String fileName = "obj_" + new Date().getTime() ;
-            File inputFile=new File(workflow.getJarDirectory()+File.separator+fileName+".in");
+            File inputFile=new File(workflow.getJarDirectory()+File.separator+fileName+".in");       //obj_time.in stored in the uploadedFiles
             File outputFile =new File(workflow.getJarDirectory()+File.separator+fileName+".out");
 
             //Serialize and write BlockData object to a file
@@ -327,7 +334,7 @@ public class Block {
             File jarDirectory = new File(workflow.getJarDirectory());
             jarDirectory.mkdirs();
             String jarFilePath = jarDirectory.getAbsolutePath()+File.separator+getModule().split(":")[0];
-            File jarFile = new File(jarFilePath);
+            File jarFile = new File(jarFilePath); //jarFile also is stored in the uploadedFiles (e.g: commons-1.0-jar-with-dependencies.jar)
 
             //Calling jar file externally with entry point at the Block's main method
             String defaultVmArgs = "-Xmx1G";
@@ -415,6 +422,7 @@ public class Block {
 
             BlockProperty blockProperty = f.getAnnotation(BlockProperty.class);
             if (blockProperty != null) {
+                //set properties of BlockData
                 if(blockProperty.type().equals(Type.FILE)){
                     blockData.getProperties().put(blockProperty.name(),new File(workflow.getRemoteDirectory()+File.separator+f.get(context)));
                 }
@@ -436,6 +444,7 @@ public class Block {
                 Data destinationData=getInput().get(key);
 
                 int inputCardinality = field.getSourceParam().size();
+                //for each input, get its corresponding previous sourceBlocks' outputs(sourceData) into the components list
                 List<Object> components=new ArrayList<>();
 
                 for(int i=0;i<inputCardinality;i++){
@@ -474,7 +483,7 @@ public class Block {
                 }
 
 
-                //Assigning outputs to destination
+                //Assigning outputs(components) to destination
                 for (Field f: context.getClass().getDeclaredFields()) {
                     f.setAccessible(true);
 
@@ -483,7 +492,9 @@ public class Block {
                         if(blockInput.name().equals(destinationData.getName())){
                             if(!blockInput.type().endsWith("[]")){
                                 Object val=components.get(0);
+                                //set the input val of this executing Block(set input vals in its own class)
                                 f.set(context,val);
+                                //set the input data of the corresponding serialized BlockData
                                 blockData.getInput().put(destinationData.getName(),val);
                             }
                             else{
@@ -554,7 +565,8 @@ public class Block {
     }
 
     /**
-     * Initialize a Block from a class
+     * Initialize a Block from a class (Initialize the block I/O(inputs properties outputs) and configurations)
+     * Set block's BlockProperty, BlockInput, BlockOutput
      */
     public void initialize(){
         if(getProperties()==null)
