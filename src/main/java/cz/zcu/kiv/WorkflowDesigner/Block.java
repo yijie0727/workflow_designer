@@ -314,9 +314,16 @@ public class Block {
         Object output;
         logger.info("Executing "+getName()+" as a JAR");
         try {
-            String fileName = "obj_" + new Date().getTime() ;
-            File inputFile=new File(workflow.getJarDirectory()+File.separator+fileName+".in");
-            File outputFile =new File(workflow.getJarDirectory()+File.separator+fileName+".out");
+            File tempInFile =  File.createTempFile("obj_in_",".in",   new File(workflow.getJarDirectory()));
+            File tempOutFile = File.createTempFile("obj_out_",".out", new File(workflow.getJarDirectory()));
+            File inputFile  = new File(tempInFile.getAbsolutePath());
+            File outputFile = new File(tempOutFile.getAbsolutePath());
+            tempInFile.deleteOnExit();
+            tempOutFile.deleteOnExit();
+
+            //String fileName = "obj_" + new Date().getTime() ;
+            //File inputFile=new File(workflow.getJarDirectory()+File.separator+fileName+".in");
+            //File outputFile =new File(workflow.getJarDirectory()+File.separator+fileName+".out");
 
             //Serialize and write BlockData object to a file
             FileOutputStream fos = new FileOutputStream(inputFile);
@@ -338,9 +345,19 @@ public class Block {
             ProcessBuilder pb = new ProcessBuilder(args);
             //Store output and error streams to files
             logger.info("Executing jar file "+jarFilePath);
-            File stdOutFile = new File("std_output.log");
+
+
+            File tempStdOutFile =  File.createTempFile("std_output_",".log", new File(workflow.getJarDirectory()));
+            File stdOutFile = new File(tempStdOutFile.getAbsolutePath());
+            File tempStdErrFile =  File.createTempFile("std_error_",".log", new File(workflow.getJarDirectory()));
+            File stdErrFile = new File(tempStdErrFile.getAbsolutePath());
+            tempStdOutFile.deleteOnExit();
+            tempStdErrFile.deleteOnExit();
+
+//            File stdOutFile = new File("std_output.log");
+//            File stdErrFile = new File("std_error.log");
+
             pb.redirectOutput(stdOutFile);
-            File stdErrFile = new File("std_error.log");
             pb.redirectError(stdErrFile);
             Process ps = pb.start();
             ps.waitFor();

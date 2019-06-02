@@ -16,6 +16,7 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.charset.Charset;
 import java.util.*;
+import java.util.concurrent.*;
 
 /***********************************************************************************************************************
  *
@@ -226,6 +227,7 @@ public class Workflow {
      * populateWaitList - Joey Pinto
      *
      * Populate wait list of blocks that are unprocessed
+     * and their source blocks are already processed or they only have properties
      * @param edgesArray - JSON from frontend containing connected edges
      * @param blocks - Map of block ID to block object
      * @return
@@ -271,7 +273,8 @@ public class Workflow {
      * @param workflowOutputFile File to constantly update the progress of the workflow
      * @throws Exception
      */
-    public JSONArray execute(JSONObject jObject, String outputFolder, String workflowOutputFile) throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException, FieldMismatchException, IOException {
+    public JSONArray execute(JSONObject jObject, String outputFolder, String workflowOutputFile)
+            throws InterruptedException, ExecutionException, InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException, FieldMismatchException, IOException {
 
         logger.info("Starting execution of Workflow");
         JSONArray blocksArray = jObject.getJSONArray("blocks");
@@ -281,7 +284,7 @@ public class Workflow {
 
         JSONArray edgesArray = jObject.getJSONArray("edges");
 
-        Block waitBlock;
+        //Block waitBlock;
         boolean error=false;
         while(!error){
             //Populate wait list
@@ -290,120 +293,127 @@ public class Workflow {
             //Wait queue is empty, exit
             if(wait.size()==0)break;
 
+
+            BlockThreadPool blockThreadPool = new BlockThreadPool(jObject, outputFolder, workflowOutputFile, wait, blocks, this);
+            error = blockThreadPool.createBlocksThreadPool();
+
+
             //Process wait queue
-            for (Integer aWait : wait) {
-                boolean ready = true;
-                int waitBlockId = aWait;
-                waitBlock = blocks.get(waitBlockId);
-
-                Map<Integer, Block> dependencies = new HashMap<>();
-
-
-                Map<String,InputField>fields=new HashMap<>();
-
-                
-                //Check dependencies of waiting block
-                for (int i = 0; i < edgesArray.length(); i++) {
-                    JSONObject edgeObject = edgesArray.getJSONObject(i);
-
-                    //Choose only edges that end on block 2
-                    if (waitBlockId != edgeObject.getInt("block2")) continue;
-
-                    int block1Id = edgeObject.getInt("block1");
-                    Block block1 = blocks.get(block1Id);
-
-                    //Populate the dependencies into the maps
-                    populateDependencies(block1Id,block1,edgeObject,dependencies,fields);
-
-                    //A dependency is unprocessed so not ready
-                    if (!block1.isProcessed()) {
-                        ready = false;
-                        break;
-                    }
-                }
-
-                if (ready) {
-                    JSONObject block=getBlockById(blocksArray,waitBlockId);
-                    logger.info("Processing block with ID "+waitBlockId);
-                    StringBuilder stdOutBuilder =new StringBuilder();
-                    StringBuilder stdErrBuilder =new StringBuilder();
-
-                    //Process the ready block
-                    Object output = null;
-                    try {
-                        output = waitBlock.processBlock(dependencies, fields, stdOutBuilder, stdErrBuilder);
-                        block.put("error",false);
-                    }
-                    catch(Exception e){
-                        logger.error(e);
-                        error=true;
-                        block.put("error",true);
-                    }
-
-                    //Assemble the output JSON
-                    JSONObject jsonObject = new JSONObject();
-                    if(output==null){
-                        jsonObject = null;
-                    }
-                    else if (output.getClass().equals(String.class)){
-                        jsonObject.put("type","STRING");
-                        jsonObject.put("value",output);
-                    }
-                    else if (output.getClass().equals(File.class)){
-                        File file = (File) output;
-                        String destinationFileName="file_"+new Date().getTime()+"_"+file.getName();
-                        FileUtils.moveFile(file,new File(outputFolder+File.separator+destinationFileName));
-                        jsonObject.put("type","FILE");
-                        JSONObject fileObject=new JSONObject();
-                        fileObject.put("title",file.getName());
-                        fileObject.put("filename",destinationFileName);
-                        jsonObject.put("value",fileObject);
-                    }
-                    else if (output.getClass().equals(Table.class)){
-                        Table table=(Table)output;
-                        jsonObject.put("type","TABLE");
-                        jsonObject.put("value",table.toJSON());
-                        File file =File.createTempFile("temp_",".csv");
-                        FileUtils.writeStringToFile(file,table.toCSV(),Charset.defaultCharset());
-                        String destinationFileName="table_"+new Date().getTime()+".csv";
-                        FileUtils.moveFile(file,new File(outputFolder+File.separator+destinationFileName));
-                        JSONObject fileObject=new JSONObject();
-                        fileObject.put("title",destinationFileName);
-                        fileObject.put("filename",destinationFileName);
-                        jsonObject.put("value",fileObject);
-                    }
-                    else if (output.getClass().equals(Graph.class)){
-                        Graph graph=(Graph)output;
-                        jsonObject.put("type","GRAPH");
-                        jsonObject.put("value",graph.toJSON());
-                        File file =File.createTempFile("temp_",".json");
-                        FileUtils.writeStringToFile(file,graph.toJSON().toString(4),Charset.defaultCharset());
-                        String destinationFileName="graph_"+new Date().getTime()+".json";
-                        FileUtils.moveFile(file,new File(outputFolder+File.separator+destinationFileName));
-                        JSONObject fileObject=new JSONObject();
-                        fileObject.put("title",destinationFileName);
-                        fileObject.put("filename",destinationFileName);
-                        jsonObject.put("value",fileObject);
-                    }
-                    else{
-                        jsonObject.put("type","");
-                        jsonObject.put("value",output.toString());
-                    }
-
-                    if (jsonObject != null)
-                        block.put("output", jsonObject);
-                    block.put("stdout", stdOutBuilder.toString());
-                    block.put("stderr", stdErrBuilder.toString());
-                    block.put("completed", true);
-
-                    //Save Present state of output to file
-                    if(workflowOutputFile!=null){
-                        File workflowOutput=new File(workflowOutputFile);
-                        FileUtils.writeStringToFile(workflowOutput,blocksArray.toString(4),Charset.defaultCharset());
-                    }
-                }
-                if(error)break;
-            }
+//            for (Integer aWait : wait) {
+//                boolean ready = true;
+//                int waitBlockId = aWait;
+//                waitBlock = blocks.get(waitBlockId);
+//
+//                Map<Integer, Block> dependencies = new HashMap<>();
+//
+//
+//                Map<String,InputField>fields=new HashMap<>();
+//
+//
+//                //Check dependencies of waiting block
+//                for (int i = 0; i < edgesArray.length(); i++) {
+//                    JSONObject edgeObject = edgesArray.getJSONObject(i);
+//
+//                    //Choose only edges that end on block 2
+//                    if (waitBlockId != edgeObject.getInt("block2")) continue;
+//
+//                    int block1Id = edgeObject.getInt("block1");
+//                    Block block1 = blocks.get(block1Id);
+//
+//                    //Populate the dependencies into the maps
+//                    populateDependencies(block1Id,block1,edgeObject,dependencies,fields);
+//
+//                    //A dependency is unprocessed so not ready
+//                    if (!block1.isProcessed()) {
+//                        ready = false;
+//                        break;
+//                    }
+//                }
+//
+//                if (ready) {
+//                    JSONObject block=getBlockById(blocksArray,waitBlockId);
+//                    logger.info("Processing block with ID "+waitBlockId);
+//                    StringBuilder stdOutBuilder =new StringBuilder();
+//                    StringBuilder stdErrBuilder =new StringBuilder();
+//
+//                    //Process the ready block
+//                    Object output = null;
+//                    try {
+//                        output = waitBlock.processBlock(dependencies, fields, stdOutBuilder, stdErrBuilder);
+//                        block.put("error",false);
+//                    }
+//                    catch(Exception e){
+//                        logger.error(e);
+//                        error=true;
+//                        block.put("error",true);
+//                    }
+//
+//                    //Assemble the output JSON
+//                    JSONObject jsonObject = new JSONObject();
+//                    if(output==null){
+//                        jsonObject = null;
+//                    }
+//                    else if (output.getClass().equals(String.class)){
+//                        jsonObject.put("type","STRING");
+//                        jsonObject.put("value",output);
+//                    }
+//                    else if (output.getClass().equals(File.class)){
+//                        File file = (File) output;
+//                        String destinationFileName="file_"+new Date().getTime()+"_"+file.getName();
+//                        FileUtils.moveFile(file,new File(outputFolder+File.separator+destinationFileName));
+//                        jsonObject.put("type","FILE");
+//                        JSONObject fileObject=new JSONObject();
+//                        fileObject.put("title",file.getName());
+//                        fileObject.put("filename",destinationFileName);
+//                        jsonObject.put("value",fileObject);
+//                    }
+//                    else if (output.getClass().equals(Table.class)){
+//                        Table table=(Table)output;
+//                        jsonObject.put("type","TABLE");
+//                        jsonObject.put("value",table.toJSON());
+//                        File file =File.createTempFile("temp_",".csv");
+//                        FileUtils.writeStringToFile(file,table.toCSV(),Charset.defaultCharset());
+//                        String destinationFileName="table_"+new Date().getTime()+".csv";
+//                        FileUtils.moveFile(file,new File(outputFolder+File.separator+destinationFileName));
+//                        JSONObject fileObject=new JSONObject();
+//                        fileObject.put("title",destinationFileName);
+//                        fileObject.put("filename",destinationFileName);
+//                        jsonObject.put("value",fileObject);
+//                    }
+//                    else if (output.getClass().equals(Graph.class)){
+//                        Graph graph=(Graph)output;
+//                        jsonObject.put("type","GRAPH");
+//                        jsonObject.put("value",graph.toJSON());
+//                        File file =File.createTempFile("temp_",".json");
+//                        FileUtils.writeStringToFile(file,graph.toJSON().toString(4),Charset.defaultCharset());
+//                        String destinationFileName="graph_"+new Date().getTime()+".json";
+//                        FileUtils.moveFile(file,new File(outputFolder+File.separator+destinationFileName));
+//                        JSONObject fileObject=new JSONObject();
+//                        fileObject.put("title",destinationFileName);
+//                        fileObject.put("filename",destinationFileName);
+//                        jsonObject.put("value",fileObject);
+//                    }
+//                    else{
+//                        jsonObject.put("type","");
+//                        jsonObject.put("value",output.toString());
+//                    }
+//
+//                    if (jsonObject != null)
+//                        block.put("output", jsonObject);
+//                        block.put("stdout", stdOutBuilder.toString());
+//                        block.put("stderr", stdErrBuilder.toString());
+//                        block.put("completed", true);
+//
+//                    //Save Present state of output to file
+//                    if(workflowOutputFile!=null){
+//                        File workflowOutput=new File(workflowOutputFile);
+//                        FileUtils.writeStringToFile(workflowOutput,blocksArray.toString(4),Charset.defaultCharset());
+//                    }
+//                }
+//
+//
+//                if(error)break;
+//            }
 
         }
 
@@ -428,7 +438,7 @@ public class Workflow {
      * @param fields - Input field Annotations
      */
 
-    private void populateDependencies(int block1Id, Block block1, JSONObject edgeObject, Map<Integer,Block> dependencies, Map<String,InputField> fields) {
+    public void populateDependencies(int block1Id, Block block1, JSONObject edgeObject, Map<Integer,Block> dependencies, Map<String,InputField> fields) {
         JSONArray connector1 = edgeObject.getJSONArray("connector1");
         JSONArray connector2 = edgeObject.getJSONArray("connector2");
 
