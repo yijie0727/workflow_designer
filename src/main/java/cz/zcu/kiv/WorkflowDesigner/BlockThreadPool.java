@@ -14,7 +14,7 @@ import java.util.concurrent.*;
 public class BlockThreadPool {
 
     private static Log logger = LogFactory.getLog(BlockThreadPool.class);
-    private static final int POOL_SIZE = 5;   //pool size
+    private static final int POOL_SIZE = 1;   //pool size
     private static final int QUEUE_SIZE = 50; //task queue size
 
     private ThreadPoolExecutor blockTasksPool;

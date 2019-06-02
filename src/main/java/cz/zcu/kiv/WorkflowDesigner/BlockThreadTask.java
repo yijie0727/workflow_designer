@@ -27,10 +27,8 @@ public class BlockThreadTask implements Callable<String> {
     private String workflowOutputFile;
     private Workflow workflow;
 
-    private Block waitBlock;
     //private boolean error = false;
-
-    private String errorFlag = "FALSE";
+    private String errorFlag;
 
     public BlockThreadTask(int index, int waitBlockId, Map<Integer, Block> blocks, JSONObject jObject, String outputFolder, String workflowOutputFile, Workflow workflow) {
         this.index = index;
@@ -40,6 +38,7 @@ public class BlockThreadTask implements Callable<String> {
         this.outputFolder = outputFolder;
         this.workflowOutputFile = workflowOutputFile;
         this.workflow = workflow;
+        this.errorFlag = "FALSE";
     }
 
     @Override
@@ -50,7 +49,7 @@ public class BlockThreadTask implements Callable<String> {
         JSONArray edgesArray = this.jObject.getJSONArray("edges");
         JSONArray blocksArray = jObject.getJSONArray("blocks");
 
-        waitBlock = blocks.get(waitBlockId);
+        Block waitBlock = blocks.get(waitBlockId);
 
         Map<Integer, Block> dependencies = new HashMap<>();
         Map<String,InputField>fields=new HashMap<>();
