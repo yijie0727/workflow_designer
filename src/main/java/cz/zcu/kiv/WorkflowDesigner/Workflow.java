@@ -293,7 +293,7 @@ public class Workflow {
             //Wait queue is empty, exit
             if(wait.size()==0)break;
 
-
+            logger.info("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Start a Thread Pool: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^");
             BlockThreadPool blockThreadPool = new BlockThreadPool(jObject, outputFolder, workflowOutputFile, wait, blocks, this);
             error = blockThreadPool.createBlocksThreadPool();
 

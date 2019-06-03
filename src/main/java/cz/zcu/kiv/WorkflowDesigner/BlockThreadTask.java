@@ -43,8 +43,8 @@ public class BlockThreadTask implements Callable<String> {
 
     @Override
     public String call() throws Exception {
-        logger.info("**************************************    Call Task:     **************************************  ");
-        logger.info("Call BlockTask Thread "+index+": "+ Thread.currentThread().getName());
+        logger.info("* Call Task: ");
+        logger.info("* Call BlockTask Thread "+index+": "+ Thread.currentThread().getName());
 
         JSONArray edgesArray = this.jObject.getJSONArray("edges");
         JSONArray blocksArray = jObject.getJSONArray("blocks");

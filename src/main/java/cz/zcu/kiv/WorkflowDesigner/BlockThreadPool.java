@@ -14,7 +14,7 @@ import java.util.concurrent.*;
 public class BlockThreadPool {
 
     private static Log logger = LogFactory.getLog(BlockThreadPool.class);
-    private static final int POOL_SIZE = 1;   //pool size
+    private static final int POOL_SIZE = 5;   //pool size
     private static final int QUEUE_SIZE = 50; //task queue size
 
     private ThreadPoolExecutor blockTasksPool;
@@ -44,8 +44,7 @@ public class BlockThreadPool {
      * create ThreadPool
      */
     public boolean createBlocksThreadPool() throws InterruptedException, ExecutionException{
-        logger.info("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^   Thread Pool   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^:");
-        logger.info("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Create a threadPool for all the blocks populated by the populateWaitList.");
+        logger.info("* Create a threadPool for all the blocks populated by the populateWaitList.");
 
         boolean error = false;
         List<Future<?>> futures = new ArrayList<>();
@@ -82,8 +81,8 @@ public class BlockThreadPool {
 
 
     public Future submit(int index, Callable blockThreadTask){
-        logger.info("**************************************   ThreadPool Submit:");
-        logger.info("**************************************   Call a Block Task thread "+index+" for Block execution.");
+        logger.info("* ThreadPool Submit:");
+        logger.info("* Call a Block Task thread "+index+" for Block execution.");
 
         return blockTasksPool.submit(blockThreadTask);
 
@@ -104,7 +103,7 @@ public class BlockThreadPool {
      *  shutdown
      */
     public void shutdown() {
-        logger.info("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@  shutdown Pool... @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@   ");
+        logger.info("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^  shutdown Pool... ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^");
         blockTasksPool.shutdown();
 
       //  try {
