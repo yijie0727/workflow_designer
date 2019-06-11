@@ -4,52 +4,39 @@ import cz.zcu.kiv.WorkflowDesigner.Annotations.*;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.SerializationUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.reflections.Reflections;
+
 import java.io.*;
 import java.lang.annotation.Annotation;
-import java.lang.reflect.*;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.ParameterizedType;
 import java.nio.charset.Charset;
 import java.util.*;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
 /***********************************************************************************************************************
  *
- * This file is part of the Workflow Designer project
-
- * ==========================================
+ * ContinuousBlock, GSoC 2019, 2019/05/06 Yijie Huang
+ * Part of the methods are cited from the GSoC 2018 Block.java coded by Joey Pinto
  *
- * Copyright (C) 2018 by University of West Bohemia (http://www.zcu.cz/en/)
- *
- ***********************************************************************************************************************
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
- * the License. You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
- * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
- * specific language governing permissions and limitations under the License.
- *
- ***********************************************************************************************************************
- *
- * Block, 2018/16/05 13:32 Joey Pinto
- *
- * This file is the model for a single block in the workflow designer tool
+ * This file is the model for a single block to acheive the continuous data process in the workflow designer tool.
  **********************************************************************************************************************/
 
+public class ContinuousBlock {
+    private static Log logger = LogFactory.getLog(ContinuousBlock.class);
 
-public class Block {
-    private Workflow workflow;
+    private ContinuousWorkflow continuousWorkflow;
     private String name;
     private String family;
     private String module;
     private String description;
     private boolean jarExecutable;
+    private boolean rmiExecutable;
     private Map<String, Data> input;
     private Map<String, Data> output;
     private Map<String,Property> properties;
@@ -57,156 +44,82 @@ public class Block {
     //Actual Object instance maintained as context
     private Object context;
 
-    private static Log logger = LogFactory.getLog(Block.class);
+    public static final int PENDING = 0;    //Wait to receive inputs/properties continuous data to process
+    public static final int PROCESSING = 1; //Block is processing inputs/properties continuous data
+    public static final int END = 2;        //No longer accept data(input/property) anymore (done all the process job already)（may still has outputs not be fetched by its destination Blocks ）
 
-    public Object getContext() {
-        return context;
-    }
+    private int blockStatus = PENDING;      //in the very beginning, every block is in the PENDING status
+    private boolean comingPropertyPrepared = true;     //only useful for the Blocks only with @BlockProperty annotation without @BlockInput. In the very beginning, those block are by default receiving the coming continuous data
+    private boolean outputPrepared = false; //prepared the output already or not
+    private int connectedCount = 0;         //the number of destination Blocks it connects
+    private int sentDataCount = 0;          //the number of it sends its previous output(just generated) to its different destination Blocks
 
-    public void setContext(Object context) {
+    public ContinuousBlock(Object context, ContinuousWorkflow continuousWorkflow) {
         this.context = context;
+        this.continuousWorkflow = continuousWorkflow;
     }
-
-    private boolean processed=false;
 
     /**
-     * @param blockObject - Initialize a Block object from a JSON representation
+     * checkComingPropertyPrepared - Yijie Huang
+     * -  only useful for the ContinuousBlocks only with @BlockProperty annotation.
+     * In the very beginning, those block are by default receiving the coming continuous data
+     *
      */
-    public void fromJSON(JSONObject blockObject) throws NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException, FieldMismatchException {
-        this.name = blockObject.getString("type");
-        this.module = blockObject.getString("module");
+    public void checkComingPropertyPrepared(){
+        logger.info("                                                                                                                                ^ checkComingPropertyPrepared for ContinuousBlock "+ this.getName());
+        //for Blocks (not receive the continuous data)
+        //this variable: comingPropertyPrepared is meaningless
 
-        //Get block definition from workflow
-        Block block = workflow.getDefinition(this.name);
+        //for ContinuousBlocks has inputs, they no need to check this variable to modify the comingPropertyPrepared
 
-        if(block==null){
-            logger.error("Could not find definition of block type "+this.name);
-            throw new FieldMismatchException(this.name,"block type");
-        }
+        //reflect to get the  ContinuousProperty of the context of the Continuous Block and detect whether it has continuous data or not
+        for (Field f: context.getClass().getDeclaredFields()) {
+            f.setAccessible(true);
 
-        this.family = block.getFamily();
-        this.properties = block.getProperties();
-        this.input = block.getInput();
-        this.output = block.getOutput();
-        this.jarExecutable = block.isJarExecutable();
+            ContinuousProperty continuousProperty = f.getAnnotation(ContinuousProperty.class);
+            if (continuousProperty != null) {
+                if(f.getGenericType().toString().equals("boolean")){
+                    try
+                    {
+                        boolean continuous = (boolean)f.get(this.getContext());
+                        logger.info("                                                                                                                                # Now @ContinuousProperty continuous = "+ continuous + " for ContinuousBlock "+ this.getName());
+                        if(!continuous) {
+                            this.setComingPropertyPrepared(false);
+                            logger.info("                                                                                                                                # SET boolean comingPropertyPrepared = "+ comingPropertyPrepared + " for ContinuousBlock "+ this.getName());
 
-
-        JSONObject values = blockObject.getJSONObject("values");
-
-        //Map properties to object parameters
-        for(String key:this.properties.keySet()){
-            if(values.has(key)){
-                for (Field f: context.getClass().getDeclaredFields()) {
-                    f.setAccessible(true);
-                    BlockProperty blockProperty = f.getAnnotation(BlockProperty.class);
-                    if (blockProperty != null) {
-                        if(blockProperty.name().equals(key)){
-                            properties.put(blockProperty.name(), new Property(blockProperty.name(), blockProperty.type(), blockProperty.defaultValue(), blockProperty.description()));
-
-                            //Assign object attributes from properties
-                            if(blockProperty.type().endsWith("[]")){
-
-                                //Dealing with List properties
-                                if(f.getType().isArray()){
-                                    //Unsupported by reflection
-                                    throw new IllegalAccessException("Arrays Not supported, Use List instead");
-                                }
-                                List<Object>components=new ArrayList<>();
-                                JSONArray array=values.getJSONArray(key);
-                                ParameterizedType listType = (ParameterizedType) f.getGenericType();
-                                Class<?> listClass = (Class<?>) listType.getActualTypeArguments()[0];
-                                for(int i=0;i<array.length();i++){
-                                    if(listClass.equals(File.class)){
-                                        components.add(new File(workflow.getRemoteDirectory()+File.separator+array.get(i)));
-                                    }
-                                    else components.add(array.get(i));
-                                }
-                                f.set(context,components);
-                            }
-                            else f.set(context,getFieldFromJSON(f,values, key));
                             break;
                         }
+                    }catch ( IllegalAccessException e ) {
+                        logger.error(e);
                     }
                 }
             }
         }
-
-        logger.info("Instantiated "+getName()+" block from Workflow");
-
     }
 
+
     /**
-     * Get value of actual property field
-     * @param f - Relfection field
-     * @param values - JSON object containing values assigned to properties
-     * @param key - Key to get Field
-     * @return Actual object instance
+     * outputDataFetched - Yijie Huang
+     *
+     * used to check whether the Block sends this output to all its destination Blocks, if true reset its outputPrepared to false
      */
-    private Object getFieldFromJSON(Field f, JSONObject values, String key) {
-        try {
-            if (f.getType().equals(int.class) || f.getType().equals(Integer.class))
-                return values.getInt(key);
-            else if (f.getType().equals(double.class) || f.getType().equals(Double.class))
-                return values.getDouble(key);
-            else if (f.getType().equals(boolean.class) || f.getType().equals(Boolean.class))
-                return values.getBoolean(key);
-            else if (f.getType().equals(File.class))
-                //If type is file, instance of the actual file is passed rather than just the location
-                return new File(workflow.getRemoteDirectory() + File.separator + values.getString(key));
-
-            return f.getType().cast(values.getString(key));
+    public void outputDataFetched(){
+        if(connectedCount == 0) return;
+        if(connectedCount == sentDataCount){
+            this.setSentDataCount(0);
+            this.setOutputPrepared(false);
         }
-        catch (Exception e){
-            //Unpredictable result when reading from a field
-            logger.error(e);
-            return null;
-        }
+        logger.info("                                                                                                                                 # current checked continuousBlock " + this.getName() + ", outputPrepared = " + this.isOutputPrepared() + ", sentDataCount = " +this.getSentDataCount());
     }
+
+//    public boolean outputDataFetched(){
+//        if(connectedCount == 0) return false;
+//        return connectedCount == sentDataCount;
+//    }
+
 
     /**
-     * Block constructor
-     * @param context - Object instance
-     * @param workflow - Workflow instance
-     */
-    public Block(Object context, Workflow workflow){
-        this.context = context;
-        this.workflow = workflow;
-    }
-
-
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public String getFamily() {
-        return family;
-    }
-
-    public void setFamily(String family) {
-        this.family = family;
-    }
-
-    public String getModule() {
-        return module;
-    }
-
-    public void setModule(String module) {
-        this.module = module;
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    public void setDescription(String description) {
-        this.description = description;
-    }
-
-    /**
+     * toJSON - Joey Pinto
      * Convert Block to JSON for front-end
      */
     public JSONObject toJSON(){
@@ -255,9 +168,143 @@ public class Block {
         return blockJs;
     }
 
+    /**
+     * fromJSON - Joey Pinto
+     * @param blockObject - Initialize a Block object from a JSON representation
+     */
+    public void fromJSON(JSONObject blockObject) throws NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException, FieldMismatchException {
+        this.name = blockObject.getString("type");
+        this.module = blockObject.getString("module");
+
+        //Get block definition from workflow
+        ContinuousBlock block = continuousWorkflow.getDefinition(this.name);
+
+        if(block==null){
+            logger.error("Could not find definition of block type "+this.name);
+            throw new FieldMismatchException(this.name,"block type");
+        }
+
+        this.family = block.getFamily();
+        this.properties = block.getProperties();
+        this.input = block.getInput();
+        this.output = block.getOutput();
+        this.jarExecutable = block.isJarExecutable();
+
+
+        JSONObject values = blockObject.getJSONObject("values");
+
+        //Map properties to object parameters
+        for(String key:this.properties.keySet()){
+            if(values.has(key)){
+                for (Field f: context.getClass().getDeclaredFields()) {
+                    f.setAccessible(true);
+                    BlockProperty blockProperty = f.getAnnotation(BlockProperty.class);
+                    if (blockProperty != null) {
+                        if(blockProperty.name().equals(key)){
+                            properties.put(blockProperty.name(), new Property(blockProperty.name(), blockProperty.type(), blockProperty.defaultValue(), blockProperty.description()));
+
+                            //Assign object attributes from properties
+                            if(blockProperty.type().endsWith("[]")){
+
+                                //Dealing with List properties
+                                if(f.getType().isArray()){
+                                    //Unsupported by reflection
+                                    throw new IllegalAccessException("Arrays Not supported, Use List instead");
+                                }
+                                List<Object> components=new ArrayList<>();
+                                JSONArray array=values.getJSONArray(key);
+                                ParameterizedType listType = (ParameterizedType) f.getGenericType();
+                                Class<?> listClass = (Class<?>) listType.getActualTypeArguments()[0];
+                                for(int i=0;i<array.length();i++){
+                                    if(listClass.equals(File.class)){
+                                        components.add(new File(continuousWorkflow.getRemoteDirectory()+File.separator+array.get(i)));
+                                    }
+                                    else components.add(array.get(i));
+                                }
+                                f.set(context,components);
+                            }
+                            else f.set(context,getFieldFromJSON(f,values, key));
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        logger.info("Instantiated "+getName()+" block from Workflow");
+    }
 
     /**
-     * Process a block and return value returned by BlockExecute block
+     * Get value of actual property field - Joey pinto
+     * @param f - Relfection field
+     * @param values - JSON object containing values assigned to properties
+     * @param key - Key to get Field
+     * @return Actual object instance
+     */
+    private Object getFieldFromJSON(Field f, JSONObject values, String key) {
+        try {
+            if (f.getType().equals(int.class) || f.getType().equals(Integer.class))
+                return values.getInt(key);
+            else if (f.getType().equals(double.class) || f.getType().equals(Double.class))
+                return values.getDouble(key);
+            else if (f.getType().equals(boolean.class) || f.getType().equals(Boolean.class))
+                return values.getBoolean(key);
+            else if (f.getType().equals(File.class))
+                //If type is file, instance of the actual file is passed rather than just the location
+                return new File(continuousWorkflow.getRemoteDirectory() + File.separator + values.getString(key));
+
+            return f.getType().cast(values.getString(key));
+        }
+        catch (Exception e){
+            //Unpredictable result when reading from a field
+            logger.error(e);
+            return null;
+        }
+    }
+
+    /**
+     * initialize - Joey Pinto
+     * Initialize a Block from a class
+     */
+    public void initialize(){
+        if(getProperties()==null)
+            setProperties(new HashMap<String,Property>());
+        if(getInput()==null)
+            setInput(new HashMap<String, Data>());
+        if(getOutput()==null)
+            setOutput(new HashMap<String, Data>());
+
+        for (Field f: context.getClass().getDeclaredFields()) {
+            f.setAccessible(true);
+
+            BlockProperty blockProperty = f.getAnnotation(BlockProperty.class);
+            if (blockProperty != null){
+                properties.put(blockProperty.name(),new Property(blockProperty.name(),blockProperty.type(),blockProperty.defaultValue(), blockProperty.description()));
+            }
+
+            BlockInput blockInput = f.getAnnotation(BlockInput.class);
+            if (blockInput != null){
+                String cardinality="";
+                if(blockInput.type().endsWith("[]")){
+                    cardinality=WorkflowCardinality.MANY_TO_MANY;
+                }
+                else{
+                    cardinality=WorkflowCardinality.ONE_TO_ONE;
+                }
+                input.put(blockInput.name(),new Data(blockInput.name(),blockInput.type(),cardinality));
+            }
+
+            BlockOutput blockOutput = f.getAnnotation(BlockOutput.class);
+            if (blockOutput != null){
+                output.put(blockOutput.name(),new Data(blockOutput.name(),blockOutput.type(),WorkflowCardinality.MANY_TO_MANY));
+            }
+        }
+
+        logger.info("Initialized "+getName()+" block from annotations");
+    }
+
+    /**
+     * Process a block and return value returned by BlockExecute block - Joey Pinto
      * @param blocks Map of blocks
      * @param fields Mapping of fieldName to actual field
      * @param stdOut Standard Output stream builder
@@ -265,7 +312,7 @@ public class Block {
      * @return Object returned by BlockExecute method
      * @throws Exception
      */
-    public Object processBlock(Map<Integer,Block> blocks, Map<String,InputField> fields, StringBuilder stdOut, StringBuilder stdErr) throws Exception {
+    public Object processBlock(Map<Integer, ContinuousBlock> blocks, Map<String,InputField> fields, StringBuilder stdOut, StringBuilder stdErr) throws Exception {
         Object output;
         BlockData blockData=new BlockData(getName());
 
@@ -274,7 +321,7 @@ public class Block {
         //Assign inputs to the instance
         assignInputs(blocks,fields,blockData);
 
-        if(isJarExecutable() && workflow.getJarDirectory()!=null){
+        if(isJarExecutable() && continuousWorkflow.getJarDirectory()!=null){
             //Execute block as an external JAR file
             output = executeAsJar(blockData,stdOut,stdErr);
         }
@@ -295,13 +342,16 @@ public class Block {
             }
         }
 
-        setProcessed(true);
-        logger.info("Execution of "+getName()+ " block completed successfully");
+        setBlockStatus(PENDING); /** update flags*/
+        logger.info("                                                                                                                                （0） SET BlockStatus to 【 PENDING 】, Execution of "+getName()+ " block completed successfully");
         return output;
     }
 
     /**
-     * Execute block externally as a JAR
+     * Execute block externally as a JAR - Joey Pinto
+     *
+     * modify the creation mode and storing place of obj.in/out and .log file to avoid race in multi-thread Parallel Block Execution,
+     * since under the multi-thread case, every Block Execution task will write into those files
      *
      * @param blockData Serializable BlockData model representing all the data needed by a block to execute
      * @param stdOut Standard Output Stream
@@ -314,9 +364,12 @@ public class Block {
         Object output;
         logger.info("Executing "+getName()+" as a JAR");
         try {
-            String fileName = "obj_" + new Date().getTime() ;
-            File inputFile=new File(workflow.getJarDirectory()+File.separator+fileName+".in");
-            File outputFile =new File(workflow.getJarDirectory()+File.separator+fileName+".out");
+            File tempInFile =  File.createTempFile("obj_in_",".in",   new File(continuousWorkflow.getJarDirectory()));
+            File tempOutFile = File.createTempFile("obj_out_",".out", new File(continuousWorkflow.getJarDirectory()));
+            File inputFile  = new File(tempInFile.getAbsolutePath());
+            File outputFile = new File(tempOutFile.getAbsolutePath());
+            tempInFile.deleteOnExit();
+            tempOutFile.deleteOnExit();
 
             //Serialize and write BlockData object to a file
             FileOutputStream fos = new FileOutputStream(inputFile);
@@ -324,27 +377,33 @@ public class Block {
             oos.writeObject(blockData);
             oos.close();
 
-            File jarDirectory = new File(workflow.getJarDirectory());
+            File jarDirectory = new File(continuousWorkflow.getJarDirectory());
             jarDirectory.mkdirs();
             String jarFilePath = jarDirectory.getAbsolutePath()+File.separator+getModule().split(":")[0];
             File jarFile = new File(jarFilePath);
 
-            //Calling jar file externally with entry point at the Block's main method
+            //Calling jar file externally with entry point at the ContinuousBlock's main method
             String defaultVmArgs = "-Xmx1G";
             String vmargs = System.getProperty("workflow.designer.vm.args");
             vmargs = vmargs != null ? vmargs : defaultVmArgs;
-            String[]args=new String[]{"java", vmargs, "-cp",jarFile.getAbsolutePath() ,"cz.zcu.kiv.WorkflowDesigner.Block",inputFile.getAbsolutePath(),outputFile.getAbsolutePath(),getModule().split(":")[1]};
+            String[]args=new String[]{"java", vmargs, "-cp",jarFile.getAbsolutePath() ,"cz.zcu.kiv.WorkflowDesigner.ContinuousBlock",inputFile.getAbsolutePath(),outputFile.getAbsolutePath(),getModule().split(":")[1]};
             logger.info("Passing arguments" + Arrays.toString(args));
             ProcessBuilder pb = new ProcessBuilder(args);
             //Store output and error streams to files
             logger.info("Executing jar file "+jarFilePath);
-            File stdOutFile = new File("std_output.log");
+
+            File tempStdOutFile =  File.createTempFile("std_output_",".log", new File(continuousWorkflow.getJarDirectory()));
+            File stdOutFile = new File(tempStdOutFile.getAbsolutePath());
+            File tempStdErrFile =  File.createTempFile("std_error_",".log", new File(continuousWorkflow.getJarDirectory()));
+            File stdErrFile = new File(tempStdErrFile.getAbsolutePath());
+            tempStdOutFile.deleteOnExit();
+            tempStdErrFile.deleteOnExit();
+
             pb.redirectOutput(stdOutFile);
-            File stdErrFile = new File("std_error.log");
             pb.redirectError(stdErrFile);
             Process ps = pb.start();
             ps.waitFor();
-            stdOut.append(FileUtils.readFileToString(stdOutFile,Charset.defaultCharset()));
+            stdOut.append(FileUtils.readFileToString(stdOutFile, Charset.defaultCharset()));
             String processErr =FileUtils.readFileToString(stdErrFile,Charset.defaultCharset());
             stdErr.append(processErr);
             InputStream is=ps.getErrorStream();
@@ -399,8 +458,10 @@ public class Block {
         return output;
     }
 
+
     /**
      * Assign Inputs - Maps output fields of previous block to input fields of next block and initializes properties
+     * Add setSentDataCount to update the source blocks'sentDataCount to the GSoC 2018 project by Joey Pinto
      * @param blocks
      * @param fields
      * @param blockData
@@ -408,7 +469,7 @@ public class Block {
      * @throws IllegalAccessException
      * @throws ClassNotFoundException
      */
-    private void assignInputs(Map<Integer,Block> blocks, Map<String,InputField> fields, BlockData blockData) throws FieldMismatchException, IllegalAccessException, ClassNotFoundException {
+    private void assignInputs(Map<Integer,ContinuousBlock> blocks, Map<String,InputField> fields, BlockData blockData) throws FieldMismatchException, IllegalAccessException, ClassNotFoundException {
         //Assign properties to object instance
         for (Field f: context.getClass().getDeclaredFields()) {
             f.setAccessible(true);
@@ -416,7 +477,7 @@ public class Block {
             BlockProperty blockProperty = f.getAnnotation(BlockProperty.class);
             if (blockProperty != null) {
                 if(blockProperty.type().equals(Type.FILE)){
-                    blockData.getProperties().put(blockProperty.name(),new File(workflow.getRemoteDirectory()+File.separator+f.get(context)));
+                    blockData.getProperties().put(blockProperty.name(),new File(continuousWorkflow.getRemoteDirectory()+File.separator+f.get(context)));
                 }
                 else blockData.getProperties().put(blockProperty.name(),f.get(context));
             }
@@ -425,7 +486,6 @@ public class Block {
         if(getInput()!=null&&getInput().size()>0) {
 
             //Assigning inputs
-
             for (String key : getInput().keySet()) {
                 InputField field = fields.get(key);
                 if(field==null){
@@ -442,7 +502,7 @@ public class Block {
                     Object value = null;
                     String sourceParam = field.getSourceParam().get(i);
                     int sourceBlockId = field.getSourceBlock().get(i);
-                    Block sourceBlock = blocks.get(sourceBlockId);
+                    ContinuousBlock sourceBlock = blocks.get(sourceBlockId);
                     if(field.getSourceBlock()==null){
                         logger.error("Could not find the source block for the input "+key+" for a "+getName()+" block");
                         throw new FieldMismatchException(key,"source");
@@ -467,12 +527,16 @@ public class Block {
                                 break;
                             }
                         }
+
+                        //update source blocks'sentDataCount
+                        int sentCount = sourceBlock.getSentDataCount();
+                        sourceBlock.setSentDataCount(++sentCount);
+                        logger.info("                                                                                                                                # SourceBlock "+sourceBlock.getName() +", SourceBlock's sentCount = "+sourceBlock.getSentDataCount());
+
+
                     }
-
                     components.add(value);
-
                 }
-
 
                 //Assigning outputs to destination
                 for (Field f: context.getClass().getDeclaredFields()) {
@@ -493,20 +557,16 @@ public class Block {
                                 f.set(context,f.getType().cast(components));
                                 blockData.getInput().put(destinationData.getName(),components);
                             }
-
                             break;
                         }
                     }
                 }
-
             }
         }
-
-
     }
 
     /**
-     * process - execute a method annotated by Block Execute annotation
+     * process - execute a method annotated by Block Execute annotation - Joey Pinto
      * @return whatever object is returned by the method
      */
     public Object process() throws InvocationTargetException, IllegalAccessException {
@@ -521,79 +581,9 @@ public class Block {
         return output;
     }
 
-    public Map<String, Property> getProperties() {
-        return properties;
-    }
-
-    public void setProperties(Map<String, Property> properties) {
-        this.properties = properties;
-    }
-
-    public Map<String, Data> getInput() {
-        return input;
-    }
-
-    public void setInput(Map<String, Data> input) {
-        this.input = input;
-    }
-
-    public Map<String, Data> getOutput() {
-        return output;
-    }
-
-    public void setOutput(Map<String, Data> output) {
-        this.output = output;
-    }
-
-    public boolean isProcessed() {
-        return processed;
-    }
-
-    public void setProcessed(boolean processed) {
-        this.processed = processed;
-    }
 
     /**
-     * Initialize a Block from a class
-     */
-    public void initialize(){
-        if(getProperties()==null)
-            setProperties(new HashMap<String,Property>());
-        if(getInput()==null)
-            setInput(new HashMap<String, Data>());
-        if(getOutput()==null)
-            setOutput(new HashMap<String, Data>());
-
-        for (Field f: context.getClass().getDeclaredFields()) {
-            f.setAccessible(true);
-
-            BlockProperty blockProperty = f.getAnnotation(BlockProperty.class);
-            if (blockProperty != null){
-                properties.put(blockProperty.name(),new Property(blockProperty.name(),blockProperty.type(),blockProperty.defaultValue(), blockProperty.description()));
-            }
-
-            BlockInput blockInput = f.getAnnotation(BlockInput.class);
-            if (blockInput != null){
-                String cardinality="";
-                if(blockInput.type().endsWith("[]")){
-                    cardinality=WorkflowCardinality.MANY_TO_MANY;
-                }
-                else{
-                    cardinality=WorkflowCardinality.ONE_TO_ONE;
-                }
-                input.put(blockInput.name(),new Data(blockInput.name(),blockInput.type(),cardinality));
-            }
-
-            BlockOutput blockOutput = f.getAnnotation(BlockOutput.class);
-            if (blockOutput != null){
-                output.put(blockOutput.name(),new Data(blockOutput.name(),blockOutput.type(),WorkflowCardinality.MANY_TO_MANY));
-            }
-        }
-        logger.info("Initialized "+getName()+" block from annotations");
-
-    }
-
-    /**
+     *  main - Joey Pinto
      *  Externally access main function, modification of parameters will affect reflective access
      *
      * @param args 1) serialized input file 2) serialized output file 3) Package Name
@@ -602,11 +592,8 @@ public class Block {
         try {
             //Reading BlockData object from file
             BlockData blockData = SerializationUtils.deserialize(FileUtils.readFileToByteArray(new File(args[0])));
-
             Set<Class<?>> blockTypes = new Reflections(args[2]).getTypesAnnotatedWith(BlockType.class);
-
             Class type = null;
-
             for (Class blockType : blockTypes) {
                 Annotation annotation = blockType.getAnnotation(BlockType.class);
                 Class<? extends Annotation>  currentType = annotation.annotationType();
@@ -627,7 +614,6 @@ public class Block {
                 throw new Exception("Error Finding Annotated Class");
             }
 
-
             for(Field field:type.getDeclaredFields()){
                 field.setAccessible(true);
                 if(field.getAnnotation(BlockInput.class)!=null){
@@ -638,9 +624,7 @@ public class Block {
                 }
             }
 
-
             Method executeMethod = null;
-
             for(Method m:type.getDeclaredMethods()){
                 m.setAccessible(true);
                 if(m.getAnnotation(BlockExecute.class)!=null){
@@ -659,13 +643,11 @@ public class Block {
             }
 
             blockData.setOutput(new HashMap<String, Object>());
-
             for(Field field:type.getDeclaredFields()){
                 field.setAccessible(true);
                 if(field.getAnnotation(BlockOutput.class)!=null){
                     blockData.getOutput().put(field.getAnnotation(BlockOutput.class).name(),field.get(obj));
                 }
-
             }
 
             //Write output object to file
@@ -685,11 +667,126 @@ public class Block {
         }
     }
 
+
+
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getFamily() {
+        return family;
+    }
+
+    public void setFamily(String family) {
+        this.family = family;
+    }
+
+    public String getModule() {
+        return module;
+    }
+
+    public void setModule(String module) {
+        this.module = module;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
     public boolean isJarExecutable() {
         return jarExecutable;
     }
 
     public void setJarExecutable(boolean jarExecutable) {
         this.jarExecutable = jarExecutable;
+    }
+
+    public boolean isRmiExecutable() {
+        return rmiExecutable;
+    }
+
+    public void setRmiExecutable(boolean rmiExecutable) {
+        this.rmiExecutable = rmiExecutable;
+    }
+
+    public Map<String, Data> getInput() {
+        return input;
+    }
+
+    public void setInput(Map<String, Data> input) {
+        this.input = input;
+    }
+
+    public Map<String, Data> getOutput() {
+        return output;
+    }
+
+    public void setOutput(Map<String, Data> output) {
+        this.output = output;
+    }
+
+    public Map<String, Property> getProperties() {
+        return properties;
+    }
+
+    public void setProperties(Map<String, Property> properties) {
+        this.properties = properties;
+    }
+
+    public Object getContext() {
+        return context;
+    }
+
+    public void setContext(Object context) {
+        this.context = context;
+    }
+
+    public int getBlockStatus() {
+        return blockStatus;
+    }
+
+    public void setBlockStatus(int blockStatus) {
+        this.blockStatus = blockStatus;
+    }
+
+    public boolean isComingPropertyPrepared() {
+        return comingPropertyPrepared;
+    }
+
+    public void setComingPropertyPrepared(boolean comingPropertyPrepared) {
+        this.comingPropertyPrepared = comingPropertyPrepared;
+    }
+
+    public boolean isOutputPrepared() {
+        return outputPrepared;
+    }
+
+    public void setOutputPrepared(boolean outputPrepared) {
+        this.outputPrepared = outputPrepared;
+    }
+
+    public int getConnectedCount() {
+        return connectedCount;
+    }
+
+    public void setConnectedCount(int connectedCount) {
+        this.connectedCount = connectedCount;
+    }
+
+    public int getSentDataCount() {
+        return sentDataCount;
+    }
+
+    public void setSentDataCount(int sentDataCount) {
+        this.sentDataCount = sentDataCount;
     }
 }
