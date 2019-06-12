@@ -19,9 +19,19 @@ public class ContinuousConstant implements Serializable {
     @ContinuousProperty(name = "continuousFlag")
     private boolean continuousFlag = true;
 
+    @ContinuousGet
+    public boolean isContinuousFlag() {
+        return continuousFlag;
+    }
+
+    public void setContinuousFlag(boolean continuousFlag) {
+        this.continuousFlag = continuousFlag;
+    }
+
     @BlockExecute
     public void process(){
         op=val;
-        continuousFlag = false;
+        //continuousFlag = false;
+        setContinuousFlag(false);
     }
 }

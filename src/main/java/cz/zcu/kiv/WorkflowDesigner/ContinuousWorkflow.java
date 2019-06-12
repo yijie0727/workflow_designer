@@ -61,6 +61,22 @@ public class ContinuousWorkflow {
 
 
     /**
+     * initializeBlocks - Joey Pinto
+     * This method initializes a directory made up of javascript files with all annotated blocktypes
+     * @throws IOException - Exception if there is a problem creating directories
+     */
+    public JSONArray initializeBlocks() throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
+        JSONArray blocksArray=new JSONArray();
+        for(ContinuousBlock block:getBlockDefinitions()){
+            //Write JS file description of block to array
+            blocksArray.put(block.toJSON());
+        }
+        logger.info("Initialized "+blocksArray.length()+" blocks");
+        return blocksArray;
+    }
+
+
+    /**
      * getBlockDefinitions - Joey Pinto
      * This method creates a singleton access to block definitions
      *
@@ -204,19 +220,19 @@ public class ContinuousWorkflow {
      * @return
      */
     public int populateWaitList(List<Integer> wait, JSONArray edgesArray, Map<Integer, ContinuousBlock> blocks) {
-
+        logger.info("                                                                                      Begin populateWaitList: ");
         int endCount = 0;
 
         for(Integer currBlockId : blocks.keySet()){
             ContinuousBlock current = blocks.get(currBlockId);
 
             //update Block Flags: whether all its destination fetch its previous output
-            current.outputDataFetched();
+            current.outputDataFetched(currBlockId);
 //            if(current.outputDataFetched()){
 //                current.setOutputPrepared(false);
 //                current.setSentDataCount(0);
 //            }
-            logger.info("                                                                                                                                 # In populateWaitList, currentBlock is "+current.getName()+", BlockID = "+currBlockId+", Status = "+current.getBlockStatus());
+            logger.info("                                                                                         # In populateWaitList, currentBlock is "+current.getName()+", BlockID = "+currBlockId+", Status = "+current.getBlockStatus());
 
             if(current.getBlockStatus() == PROCESSING)
                 continue;
@@ -232,7 +248,7 @@ public class ContinuousWorkflow {
                 if( !current.isComingPropertyPrepared() ){
                     current.setBlockStatus(END);
                     endCount++;
-                    logger.info("                                                                                                                                 2） SET BlockStatus to 【 END 】,  current(No Inputs) = "+current.getName()+", BlockID = "+currBlockId + ", endCount = "+ endCount);
+                    logger.info("                                                                                         (2） SET current(No Inputs) = "+current.getName()+", ID = "+currBlockId + " to 【 END 】, endCount = "+ endCount);
 
                 }
                 if( current.isComingPropertyPrepared() && !current.isOutputPrepared() ){
@@ -255,9 +271,9 @@ public class ContinuousWorkflow {
                 if(currBlockId != block2Id) continue;
 
                 //update Block1 Flags: whether sourceBlock still has output prepared or already fetched
-                block1.outputDataFetched();
+                block1.outputDataFetched(block1Id);
                 //For blocks has Source Blocks, no need to consider their coming  properties, they will end when they cannot receive their source Blocks' data and source Blocks in END status
-                if( block2.getBlockStatus() != PENDING  ||  block1.getBlockStatus() != END  ||  block1.isOutputPrepared()){
+                if( block2.getBlockStatus() == PROCESSING  ||  block1.getBlockStatus() != END  ||  block1.isOutputPrepared()){
                     endFlag = false;
                 }
 
@@ -272,7 +288,7 @@ public class ContinuousWorkflow {
             if(endFlag){
                 current.setBlockStatus(END);
                 endCount++;
-                logger.info("                                                                                                                                 （2） SET BlockStatus to 【 END 】,  current(block2) = "+current.getName()+", Block2ID = "+currBlockId + ", endCount = "+ endCount);
+                logger.info("                                                                                         (2） SET  current(block2) = "+current.getName()+", Block2ID = "+currBlockId + ", to【 END 】, endCount = "+ endCount);
             }
         }
         logger.info("Wait list has "+wait.size()+" blocks");
@@ -303,6 +319,7 @@ public class ContinuousWorkflow {
             }
 
             currentBlock.setConnectedCount(connectedCount);
+            logger.info("                                                                                         @ Block "+currentBlock.getName() + ", BlockID "+currBlockId+", has " +connectedCount+ " next blocks");
         }
     }
 
@@ -351,11 +368,11 @@ public class ContinuousWorkflow {
 
             for(Integer aWait : wait){
                 int waitBlockId = aWait;
-                logger.info("                                                                                                                                … … … … … … … … … … … … … … … … … … … … … Submit a new thread Task to the Pool for the available block,  [ blockID = "+waitBlockId +" ] … … … … … … … … … … … … … … … … … … … … … … … … … … … …");
+                logger.info("                                                                                         … … … … … … … … … … … … … … … … … … … … … Submit a new thread Task to the Pool for [ blockID = "+waitBlockId +" ] … … … … … … … … … … … … … … … … … … … … … … … … … … … …");
 
                 ContinuousBlock waitBlock = blocks.get(waitBlockId);
                 waitBlock.setBlockStatus(PROCESSING);
-                logger.info("                                                                                                                                （1） SET BlockStatus to 【 PROCESSING 】, blockName = "+waitBlock.getName()+", blockID = "+waitBlockId);
+                logger.info("                                                                                         (1） SET blockName = "+waitBlock.getName()+", ID = "+waitBlockId+" to 【 PROCESSING 】");
                 // new a Block Execution task and submit it
                 ContinuousBlockTask blockTask = new ContinuousBlockTask (waitBlockId, waitBlock, blocks, this, jObject, outputFolder, workflowOutputFile);
 

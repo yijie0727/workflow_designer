@@ -62,7 +62,7 @@ public class WorkflowDesignerTest {
         assert jsonArray.length() == 3;
     }
 
-    //@Test
+    @Test
     public void testJSONSummation() throws IOException, NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException, FieldMismatchException, InterruptedException, ExecutionException  {
 
         String json = "{\"edges\":[{\"id\":1,\"block1\":3,\"connector1\":[\"Operand\",\"output\"],\"block2\":2,\"connector2\":[\"Operand1\",\"input\",0]},{\"id\":2,\"block1\":1,\"connector1\":[\"Operand\",\"output\"],\"block2\":2,\"connector2\":[\"Operand1\",\"input\",0]}],\"blocks\":[{\"id\":1,\"x\":-277,\"y\":-223,\"type\":\"CONSTANT\",\"module\":\"workflow_test-1.0-jar-with-dependencies.jar:data\",\"values\":{\"Value\":\"3\"}},{\"id\":2,\"x\":119,\"y\":-180,\"type\":\"SUMMATION\",\"module\":\"workflow_test-1.0-jar-with-dependencies.jar:data\",\"values\":{}},{\"id\":3,\"x\":-202,\"y\":-116,\"type\":\"CONSTANT\",\"module\":\"workflow_test-1.0-jar-with-dependencies.jar:data\",\"values\":{\"Value\":\"5\"}}]}";
@@ -87,9 +87,9 @@ public class WorkflowDesignerTest {
         assert jsonArray.getJSONObject(0).getJSONObject("output").getString("value").equals("AB");
     }
 
-    @Test
+    //@Test
     public void testCData() throws IOException, NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException, FieldMismatchException, InterruptedException, ExecutionException{
-        String json = FileUtils.readFileToString(new File("test_data/ctest.json"),Charset.defaultCharset());
+        String json = FileUtils.readFileToString(new File("test_data/ttest.json"),Charset.defaultCharset());
         JSONObject jsonObject = new JSONObject(json);
         File outputFile = File.createTempFile("testJSON_CArithmetic",".json");
         outputFile.deleteOnExit();
@@ -97,26 +97,26 @@ public class WorkflowDesignerTest {
         JSONArray jsonArray = new ContinuousWorkflow(ClassLoader.getSystemClassLoader(), ":test",null,"").execute(jsonObject,"test_data",outputFile.getAbsolutePath());
 
         assert jsonArray !=null;
-        assert jsonArray.getJSONObject(0).getJSONObject("output").getInt("value")==15;
+        assert jsonArray.getJSONObject(2).getJSONObject("output").getInt("value")==15;
         assert jsonArray.length() == 3;
 
     }
 
 
-//    @Test
-//    public void testContinuousData() throws IOException, NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException, FieldMismatchException, InterruptedException, ExecutionException{
-//        String json = FileUtils.readFileToString(new File("test_data/continuousTest.json"),Charset.defaultCharset());
-//        JSONObject jsonObject = new JSONObject(json);
-//        File outputFile = File.createTempFile("testJSON_ContinuousArithmetic",".json");
-//        outputFile.deleteOnExit();
-//
-//        JSONArray jsonArray = new ContinuousWorkflow(ClassLoader.getSystemClassLoader(), ":test",null,"").execute(jsonObject,"test_data",outputFile.getAbsolutePath());
-//
-//        assert jsonArray !=null;
-//        assert jsonArray.getJSONObject(0).getJSONObject("output").getInt("value")==77;
-//        assert jsonArray.length() == 5;
-//
-//    }
+   // @Test
+    public void testContinuousData() throws IOException, NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException, FieldMismatchException, InterruptedException, ExecutionException{
+        String json = FileUtils.readFileToString(new File("test_data/continuousTest.json"),Charset.defaultCharset());
+        JSONObject jsonObject = new JSONObject(json);
+        File outputFile = File.createTempFile("testJSON_ContinuousArithmetic",".json");
+        outputFile.deleteOnExit();
+
+        JSONArray jsonArray = new ContinuousWorkflow(ClassLoader.getSystemClassLoader(), ":test",null,"").execute(jsonObject,"test_data",outputFile.getAbsolutePath());
+
+        assert jsonArray !=null;
+        assert jsonArray.getJSONObject(4).getJSONObject("output").getInt("value")==77;
+        assert jsonArray.length() == 5;
+
+    }
 
 
 

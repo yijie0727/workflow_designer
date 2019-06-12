@@ -66,7 +66,9 @@ public class ContinuousBlock {
      *
      */
     public void checkComingPropertyPrepared(){
-        logger.info("                                                                                                                                ^ checkComingPropertyPrepared for ContinuousBlock "+ this.getName());
+
+        logger.info("                                                                                         ^ checkComingPropertyPrepared for ContinuousBlock "+ this.getName());
+
         //for Blocks (not receive the continuous data)
         //this variable: comingPropertyPrepared is meaningless
 
@@ -81,11 +83,11 @@ public class ContinuousBlock {
                 if(f.getGenericType().toString().equals("boolean")){
                     try
                     {
-                        boolean continuous = (boolean)f.get(this.getContext());
-                        logger.info("                                                                                                                                # Now @ContinuousProperty continuous = "+ continuous + " for ContinuousBlock "+ this.getName());
+                        boolean continuous = (Boolean)f.get(this.getContext());
+                        logger.info("                                                                                         # Now @ContinuousProperty continuous = "+ continuous + " for ContinuousBlock "+ this.getName());
                         if(!continuous) {
                             this.setComingPropertyPrepared(false);
-                            logger.info("                                                                                                                                # SET boolean comingPropertyPrepared = "+ comingPropertyPrepared + " for ContinuousBlock "+ this.getName());
+                            logger.info("!!!  !!! !!!  !!! !!!  !!! !!!  !!! !!!  !!! !!!  !!! !!!  !!! !!!  !!! !!!  !!! !!!  !!! SET boolean comingPropertyPrepared = "+ comingPropertyPrepared + " for ContinuousBlock "+ this.getName());
 
                             break;
                         }
@@ -97,19 +99,50 @@ public class ContinuousBlock {
         }
     }
 
+    public void checkComingPropertyPrepared1(){
+        logger.info("                                                                                  ^ check ComingPropertyPrepared 【 true or false 】for ContinuousBlock "+ this.getName());
+
+        Method getContinuousMethod = null;
+        for(Method m : context.getClass().getDeclaredMethods()){
+            m.setAccessible(true);
+            if(m.getAnnotation(ContinuousGet.class)!=null){
+                getContinuousMethod = m;
+                break;
+            }
+        }
+        logger.info("getContinuousMethod = "+ getContinuousMethod);
+
+        boolean continuous = false;
+        if(getContinuousMethod!=null){
+            try{
+                continuous = (boolean)getContinuousMethod.invoke(context);
+                logger.info("                                                                          # Now @ContinuousProperty continuous = "+ continuous + " for ContinuousBlock "+ this.getName());
+
+            }catch ( Exception e){
+                e.printStackTrace();
+            }
+        }
+        if(!continuous) {
+            this.setComingPropertyPrepared(false);
+            logger.info("!!!  !!! !!!  !!! !!!  !!! !!!  !!! !!!  !!! !!!  !!! !!!  !!! !!!  SET boolean comingPropertyPrepared = "+ comingPropertyPrepared + " for ContinuousBlock "+ this.getName());
+
+        }
+
+    }
+
 
     /**
      * outputDataFetched - Yijie Huang
      *
      * used to check whether the Block sends this output to all its destination Blocks, if true reset its outputPrepared to false
      */
-    public void outputDataFetched(){
+    public void outputDataFetched(int blockId){
         if(connectedCount == 0) return;
         if(connectedCount == sentDataCount){
             this.setSentDataCount(0);
             this.setOutputPrepared(false);
         }
-        logger.info("                                                                                                                                 # current checked continuousBlock " + this.getName() + ", outputPrepared = " + this.isOutputPrepared() + ", sentDataCount = " +this.getSentDataCount());
+        logger.info("                                                                                         # current checked continuousBlock " + this.getName() + " BlockId = "+blockId+", outputPrepared = " + this.isOutputPrepared() + ", sentDataCount = " +this.getSentDataCount());
     }
 
 //    public boolean outputDataFetched(){
@@ -343,7 +376,40 @@ public class ContinuousBlock {
         }
 
         setBlockStatus(PENDING); /** update flags*/
-        logger.info("                                                                                                                                （0） SET BlockStatus to 【 PENDING 】, Execution of "+getName()+ " block completed successfully");
+        logger.info("                                                                                      (0）   Execute Successfully. SET "+getName()+ " to 【 PENDING 】");
+
+        for (Field f: context.getClass().getDeclaredFields()) {
+            f.setAccessible(true);
+
+            ContinuousProperty continuousProperty = f.getAnnotation(ContinuousProperty.class);
+            if (continuousProperty != null) {
+                if(f.getGenericType().toString().equals("boolean")){
+                    try
+                    {
+                        f.set(context, false);
+                        boolean continuous = (Boolean)f.get(this.getContext());
+
+                        logger.info("                                                                                         # Now @ContinuousProperty continuous = "+ continuous + " for ContinuousBlock "+ this.getName());
+                        if(!continuous) {
+                            this.setComingPropertyPrepared(false);
+                            logger.info("!!!  !!! !!!  !!! !!!  !!! !!!  !!! !!!  !!! !!!  !!! !!!  !!! !!!  !!! !!!  !!! !!!  !!! SET boolean comingPropertyPrepared = "+ comingPropertyPrepared + " for ContinuousBlock "+ this.getName());
+
+                            break;
+                        }
+                    }catch ( IllegalAccessException e ) {
+                        logger.error(e);
+                    }
+                }
+            }
+        }
+
+
+
+
+
+
+
+
         return output;
     }
 
@@ -524,14 +590,16 @@ public class ContinuousBlock {
                         if (blockOutput != null){
                             if(blockOutput.name().equals(sourceData.getName())) {
                                 value = f.get(sourceBlock.getContext());
+
+                                //update source blocks'sentDataCount
+                                int sentCount = sourceBlock.getSentDataCount();
+                                sourceBlock.setSentDataCount(++sentCount);
+                                logger.info("                                                        # SourceBlock "+sourceBlock.getName() +", SourceBlock's sentCount = "+sourceBlock.getSentDataCount());
+
                                 break;
                             }
                         }
 
-                        //update source blocks'sentDataCount
-                        int sentCount = sourceBlock.getSentDataCount();
-                        sourceBlock.setSentDataCount(++sentCount);
-                        logger.info("                                                                                                                                # SourceBlock "+sourceBlock.getName() +", SourceBlock's sentCount = "+sourceBlock.getSentDataCount());
 
 
                     }

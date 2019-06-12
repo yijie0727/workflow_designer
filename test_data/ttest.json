@@ -1,0 +1,62 @@
+{
+  "edges": [
+    {
+      "id": 1,
+      "block1": 1,
+      "connector1": [
+        "Operand",
+        "output"
+      ],
+      "block2": 3,
+      "connector2": [
+        "Operand1",
+        "input"
+      ]
+    },
+    {
+      "id": 2,
+      "block1": 2,
+      "connector1": [
+        "Operand",
+        "output"
+      ],
+      "block2": 3,
+      "connector2": [
+        "Operand2",
+        "input"
+      ]
+    }
+  ],
+  "blocks": [
+    {
+      "id": 1,
+      "x": -350,
+      "y": -136,
+      "type": "CCONSTANT",
+      "module": "test.jar:test",
+      "values": {
+        "Value": "12"
+      }
+    },
+    {
+      "id": 2,
+      "x": -392,
+      "y": -9,
+      "type": "CCONSTANT",
+      "module": "test.jar:test",
+      "values": {
+        "Value": "3"
+      }
+    },
+    {
+      "id": 3,
+      "x": -58,
+      "y": -3,
+      "type": "CARITHMETIC",
+      "module": "test.jar:test",
+      "values": {
+        "Operation": "add"
+      }
+    }
+  ]
+}

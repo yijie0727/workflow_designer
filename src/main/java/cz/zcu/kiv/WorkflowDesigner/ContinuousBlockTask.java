@@ -50,7 +50,7 @@ public class ContinuousBlockTask implements Callable<Boolean> {
     @Override
     public Boolean call() throws Exception {
 
-        logger.info("                                                                                                                                *** Call BlockTask Thread for Block "+ waitBlock.getName() +", Block ID "+waitBlockId+": "+ Thread.currentThread().getName());
+        logger.info("                                                                                         *** Call Thread: Block "+ waitBlock.getName() +", Block ID "+waitBlockId+":  "+ Thread.currentThread().getName());
 
         JSONArray edgesArray = this.jObject.getJSONArray("edges");
         JSONArray blocksArray = jObject.getJSONArray("blocks");
@@ -160,7 +160,7 @@ public class ContinuousBlockTask implements Callable<Boolean> {
 
         waitBlock.setOutputPrepared(true);
         waitBlock.setSentDataCount(0);
-        logger.info("                                                                                                                                # SET OutputPrepared to true, UPDATE sentDataCount = 0,  for Block "+ waitBlock.getName() +", Block D "+waitBlockId+": "+ Thread.currentThread().getName());
+        logger.info("                                                                                     # SET OutputPrepared to true, UPDATE sentDataCount = 0,  for Block "+ waitBlock.getName() +", ID "+waitBlockId+": "+ Thread.currentThread().getName());
 
         //6. Use CompletionService to fetch the error Flag of the blocked queue. (Only the completed task results will be put into the queue.)
         return errorFlag;
