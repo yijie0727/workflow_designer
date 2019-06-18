@@ -43,13 +43,13 @@ import java.util.Map;
  **********************************************************************************************************************/
 public class WorkflowDesignerTest {
 
-    //@Test
+    @Test
     public void testBlock() throws NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException {
         JSONArray blocksArray=new Workflow(ClassLoader.getSystemClassLoader(),":test",null,"").initializeBlocks();
-        assert blocksArray.length()==4;
+        assert blocksArray.length()==6;
     }
 
-    //@Test
+    @Test
     public void testJSONArithmetic() throws IOException, NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException, FieldMismatchException {
 
         String json = FileUtils.readFileToString(new File("test_data/test.json"),Charset.defaultCharset());
@@ -63,7 +63,7 @@ public class WorkflowDesignerTest {
         assert jsonArray.length() == 3;
     }
 
-   //@Test
+   @Test
     public void testJSONSummation() throws IOException, NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException, FieldMismatchException {
 
         String json = "{\"edges\":[{\"id\":1,\"block1\":3,\"connector1\":[\"Operand\",\"output\"],\"block2\":2,\"connector2\":[\"Operand1\",\"input\",0]},{\"id\":2,\"block1\":1,\"connector1\":[\"Operand\",\"output\"],\"block2\":2,\"connector2\":[\"Operand1\",\"input\",0]}],\"blocks\":[{\"id\":1,\"x\":-277,\"y\":-223,\"type\":\"CONSTANT\",\"module\":\"workflow_test-1.0-jar-with-dependencies.jar:data\",\"values\":{\"Value\":\"3\"}},{\"id\":2,\"x\":119,\"y\":-180,\"type\":\"SUMMATION\",\"module\":\"workflow_test-1.0-jar-with-dependencies.jar:data\",\"values\":{}},{\"id\":3,\"x\":-202,\"y\":-116,\"type\":\"CONSTANT\",\"module\":\"workflow_test-1.0-jar-with-dependencies.jar:data\",\"values\":{\"Value\":\"5\"}}]}";
@@ -76,7 +76,7 @@ public class WorkflowDesignerTest {
         assert jsonArray.getJSONObject(1).getJSONObject("output").getInt("value")==8;
     }
 
-    //@Test
+    @Test
     public void testConcatenate() throws IOException, NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException, FieldMismatchException {
         String json="{\"edges\":[],\"blocks\":[{\"id\":1,\"x\":-192,\"y\":-116,\"type\":\"CONCATENATE\",\"module\":\"commons-1.0-jar-with-dependencies.jar:cz.zcu.kiv.commons\",\"values\":{\"Strings\":[\"A\",\"B\"]}}]}";
         JSONObject jsonObject = new JSONObject(json);
