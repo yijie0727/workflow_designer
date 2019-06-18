@@ -27,9 +27,10 @@ public class ContinuousWorkFlow {
     private Map<Class,String> moduleSource; //initialize workflow
     private String module; //initialize front-end blocks tree
 
-    private List<ContinuousBlock> blockDefinitions;// all the blocks from one module
+    private List<ContinuousBlock> blockDefinitions;// all the blocks from one module only used for front end
 
     private Map<Integer, ContinuousBlock> indexBlocksMap;
+    private boolean[] errorFlag = new boolean[1]; //denote whether the workFlow completed successfully or not
 
     /**
      * Constructor for building BlockTrees for front-End  -- (Front-End call: initializeBlocks)
@@ -69,25 +70,17 @@ public class ContinuousWorkFlow {
         //initialize IO map
         mapBlocksIO(edgesArray);
 
-        //use reflection to connect every sourceBlock's output to its destinationBlock's input (for all the related ContinuousBlocks in this workflow)
-        //connectBlocksIO();
-
 
         logger.info("…………………………………………………………………………………………………………………………………………………………………………  Start a Thread Pool:  ………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………………… ");
-
+        errorFlag[0] = false;
         int poolSize  = blocksArray.length();
         int queueSize = blocksArray.length();
         ThreadPoolExecutor workFlowThreadPool = new ThreadPoolExecutor(poolSize, poolSize, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<Runnable>(queueSize), new ThreadPoolExecutor.AbortPolicy());
-
-
         for(int blockID: indexBlocksMap.keySet()){
             ContinuousBlock currBlock = indexBlocksMap.get(blockID);
-
-            ContinuousTask blockExecuteTask = new ContinuousTask(blockID, currBlock);
-
+            ContinuousTask blockExecuteTask = new ContinuousTask(blockID, currBlock, errorFlag);
             workFlowThreadPool.submit(blockExecuteTask);
         }
-
         workFlowThreadPool.shutdown();
         boolean loop;
         do {
@@ -106,6 +99,7 @@ public class ContinuousWorkFlow {
 
             boolean error = currBlock.isError();
             String stdErr = currBlock.getStdErr();
+            System.out.println("stdErr = " +stdErr);
             Object output = currBlock.getFinalOutputObject();
 
             if(!error){
@@ -138,8 +132,11 @@ public class ContinuousWorkFlow {
             if (JSONOutput != null)
                 blockObject.put("output", JSONOutput);
 
-            blockObject.put("stdErr", stdErr);
             blockObject.put("error", error);
+            blockObject.put("stdErr", stdErr);
+
+            if(currBlock.isCompleted())
+                blockObject.put("completed", true);
 
         }
 
@@ -148,7 +145,6 @@ public class ContinuousWorkFlow {
             File workflowOutput=new File(workflowOutputFile);
             FileUtils.writeStringToFile(workflowOutput,blocksArray.toString(4), Charset.defaultCharset());
         }
-
 
 
         if(!completeFlag)
@@ -245,19 +241,7 @@ public class ContinuousWorkFlow {
     }
 
 
-    /**
-     * connect all the OutPuts of SourcesBlocks with the corresponding Inputs of destination Blocks using reflection
-     *
-     */
-    public void connectBlocksIO() throws IllegalAccessException{
 
-        for(int blockID: indexBlocksMap.keySet()){
-            ContinuousBlock currBlock = indexBlocksMap.get(blockID);
-            if(currBlock.getInputs() == null||currBlock.getInputs().isEmpty()) continue;
-
-            currBlock.connectIO();
-        }
-    }
 
 
     public String getRemoteDirectory() {

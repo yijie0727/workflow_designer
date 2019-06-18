@@ -14,16 +14,17 @@ public class ContinuousTask implements Callable<Boolean> {
 
     private static Log logger = LogFactory.getLog(ContinuousTask.class);
 
-    private boolean error;
 
     private int blockID;
     private ContinuousBlock currBlock;
-    private StringBuilder stdErr;
+    private StringBuilder stdErr = new StringBuilder();
     private Object output;
+    private boolean[] errorFlag;
 
-    public ContinuousTask(int blockID, ContinuousBlock currBlock) {
+    public ContinuousTask(int blockID, ContinuousBlock currBlock, boolean[] errorFlag) {
         this.blockID = blockID;
         this.currBlock = currBlock;
+        this.errorFlag = errorFlag;
     }
 
 
@@ -31,6 +32,11 @@ public class ContinuousTask implements Callable<Boolean> {
     public Boolean call() throws IllegalAccessException, IOException, InterruptedException, InvocationTargetException {
 
         logger.info(" _______________ start Callable call() for id = "+blockID +", name = "+currBlock.getName()+" _______________ ");
+
+        //not execute the block execute method and return the thread if a block in the workflow already caught error
+        if(checkError()){
+            return false;
+        }
 
         //blocks with inputs
         if(currBlock.getInputs() != null && currBlock.getInputs().size() > 0 ) {
@@ -51,23 +57,28 @@ public class ContinuousTask implements Callable<Boolean> {
 
             e.printStackTrace();
             stdErr.append(ExceptionUtils.getRootCauseMessage(e)+" \n");
-
             for(String trace:ExceptionUtils.getRootCauseStackTrace(e)){
                 stdErr.append(trace+" \n");
             }
 
+
             currBlock.setError(true);
-            currBlock.setStdErr(stdErr.toString());
+            synchronized (errorFlag){ errorFlag[0] = true; }
 
             logger.error("Error executing id = "+blockID +", name = "+ currBlock.getName()+" Block natively", e);
             throw e;
         }
-
-
+        currBlock.setStdErr(stdErr.toString());
+        currBlock.setCompleted(true);
         return false;
     }
 
 
+
+    //if error = true, immediately end the thread
+    public boolean checkError(){
+        return errorFlag[0];
+    }
 
     public boolean checkInputsReady() throws IllegalAccessException, IOException{
         //check all the inputStreams of this block (already fetch that stream through reflection before the thread task call)
@@ -80,7 +91,6 @@ public class ContinuousTask implements Callable<Boolean> {
             if (blockInput != null){
                 Object stream = f.get(currBlock.getContext());
                 if (stream == null) {
-
                     return false;
                 }
             }

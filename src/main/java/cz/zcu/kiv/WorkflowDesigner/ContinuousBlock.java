@@ -38,6 +38,7 @@ public class ContinuousBlock {
     private Object finalOutputObject;
     private boolean error = false;
     private String stdErr = null;
+    private boolean completed = false;
 
 
     public ContinuousBlock(Object context, ContinuousWorkFlow continuousWorkFlow) {
@@ -172,7 +173,7 @@ public class ContinuousBlock {
     /**
      * reflection to set the block context instance 's properties field
      *
-     * // TODO how to receive the properties since it is stream data ????/////////
+     * // TODO 1. receive file 2. receive other streams
      *
      */
     public void assignProperties(JSONObject blockObject) throws IllegalAccessException{
@@ -186,7 +187,7 @@ public class ContinuousBlock {
         //Map properties to object parameters
         for(String key : this.properties.keySet()){
             //"values": {
-            //"File": "/Users/yijie/Desktop/INCF/input.txt"
+            //      "File": "/Users/xxxxx/Desktop/INCF/input.txt"
             // }
             if(values.has(key)){
                 for (Field f: context.getClass().getDeclaredFields()) {
@@ -208,7 +209,7 @@ public class ContinuousBlock {
 
 
     /**
-     * //TODO Get value of actual property field from JSON, maybe get field val from Json is no longer available for streams,,,,,No idea how to send real time stream data from front end to back end
+     * //TODO:Not only for file, but also other streams
      * @param f - Relfection field
      * @param values - JSON object containing values assigned to properties
      * @param key - Key to get Field
@@ -394,5 +395,13 @@ public class ContinuousBlock {
 
     public void setStdErr(String stdErr) {
         this.stdErr = stdErr;
+    }
+
+    public boolean isCompleted() {
+        return completed;
+    }
+
+    public void setCompleted(boolean completed) {
+        this.completed = completed;
     }
 }

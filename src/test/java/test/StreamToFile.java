@@ -10,9 +10,6 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 
-import static cz.zcu.kiv.WorkflowDesigner.Type.FILE;
-import static cz.zcu.kiv.WorkflowDesigner.Type.STREAM;
-
 
 @BlockType(type ="StreamToFile", family = "STREAM")
 public class StreamToFile {
