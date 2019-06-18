@@ -22,21 +22,10 @@ public class FileToStream {
     @BlockExecute
     public void process(){
 
-        if(fileInput == null) {
-            System.out.println("fileInput == null");
-            return;
-        } else {
-            System.out.println("fileInput name = "+ fileInput.getAbsolutePath());
-        }
 
         try{
 
             output = new FileInputStream(fileInput);
-
-            if(output == null)
-                System.out.println("FileToStream output == null");
-            else
-                System.out.println("FileToStream output != null");
 
 
         } catch (Exception e){

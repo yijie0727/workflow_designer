@@ -99,7 +99,6 @@ public class ContinuousWorkFlow {
 
             boolean error = currBlock.isError();
             String stdErr = currBlock.getStdErr();
-            System.out.println("stdErr = " +stdErr);
             Object output = currBlock.getFinalOutputObject();
 
             if(!error){

@@ -128,8 +128,8 @@ public class WorkflowDesignerTest {
                 "    ]\n" +
                 "}";
         JSONObject jsonObject = new JSONObject(json);
-        File outputFile = File.createTempFile("testFileToStreamToFile",".json", new File("/Users/yijie/Desktop/INCF"));
-       // outputFile.deleteOnExit();
+        File outputFile = File.createTempFile("testFileToStreamToFile",".json");
+        outputFile.deleteOnExit();
 
         Map<Class, String> moduleSource = new HashMap<>();
         FileToStream A = new FileToStream();
