@@ -1,4 +1,5 @@
 package test;
+import cz.zcu.kiv.WorkflowDesigner.ContinuousWorkFlow;
 import cz.zcu.kiv.WorkflowDesigner.FieldMismatchException;
 import cz.zcu.kiv.WorkflowDesigner.Workflow;
 import org.apache.commons.io.FileUtils;
@@ -10,6 +11,8 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.charset.Charset;
+import java.util.HashMap;
+import java.util.Map;
 
 
 /***********************************************************************************************************************
@@ -43,7 +46,7 @@ public class WorkflowDesignerTest {
     @Test
     public void testBlock() throws NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException {
         JSONArray blocksArray=new Workflow(ClassLoader.getSystemClassLoader(),":test",null,"").initializeBlocks();
-        assert blocksArray.length()==4;
+        assert blocksArray.length()==6;
     }
 
     @Test
@@ -84,5 +87,66 @@ public class WorkflowDesignerTest {
         assert jsonArray.length() == 1;
         assert jsonArray.getJSONObject(0).getJSONObject("output").getString("value").equals("AB");
     }
+
+    @Test
+    public void testFileToStreamToFile() throws IOException, NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException, FieldMismatchException, InterruptedException{
+        String json="{\n" +
+                "    \"edges\": [\n" +
+                "        {\n" +
+                "            \"id\": 1,\n" +
+                "            \"block1\": 1,\n" +
+                "            \"connector1\": [\n" +
+                "                \"STREAM\",\n" +
+                "                \"Output\"\n" +
+                "            ],\n" +
+                "            \"block2\": 2,\n" +
+                "            \"connector2\": [\n" +
+                "                \"STREAM\",\n" +
+                "                \"Input\"\n" +
+                "            ]\n" +
+                "        }\n" +
+                "    ],\n" +
+                "    \"blocks\": [\n" +
+                "        {\n" +
+                "            \"id\": 1,\n" +
+                "            \"x\": -472,\n" +
+                "            \"y\": -165,\n" +
+                "            \"type\": \"FileToStream\",\n" +
+                "            \"module\": \":test\",\n" +
+                "            \"values\": {\n" +
+                "                \"File\": \"/Users/yijie/Desktop/INCF/input.txt\"\n" +
+                "            }\n" +
+                "        },\n" +
+                "        {\n" +
+                "            \"id\": 2,\n" +
+                "            \"x\": -284,\n" +
+                "            \"y\": -154,\n" +
+                "            \"type\": \"StreamToFile\",\n" +
+                "            \"module\": \":test\",\n" +
+                "            \"values\": {}\n" +
+                "        }\n" +
+                "    ]\n" +
+                "}";
+        JSONObject jsonObject = new JSONObject(json);
+        File outputFile = File.createTempFile("testFileToStreamToFile",".json");
+        outputFile.deleteOnExit();
+
+        Map<Class, String> moduleSource = new HashMap<>();
+        FileToStream A = new FileToStream();
+        StreamToFile B = new StreamToFile();
+        Class classA = A.getClass();
+        Class classB = B.getClass();
+        moduleSource.put(classA, ":test");
+        moduleSource.put(classB, ":test");
+
+        JSONArray jsonArray = new ContinuousWorkFlow(ClassLoader.getSystemClassLoader(), moduleSource, "").execute(jsonObject,"test_data",outputFile.getAbsolutePath());
+        assert jsonArray !=null;
+        assert jsonArray.length() == 2;
+    }
+
+
+
+
+
 }
 
