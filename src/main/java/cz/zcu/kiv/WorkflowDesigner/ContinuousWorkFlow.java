@@ -106,7 +106,7 @@ public class ContinuousWorkFlow {
             }
 
 
-            //Assemble the output JSON
+            //Assemble the output JSON-->only add a file case(for other data types, to be continued)
             JSONObject JSONOutput = new JSONObject();
             if(output==null){
                 JSONOutput = null;
