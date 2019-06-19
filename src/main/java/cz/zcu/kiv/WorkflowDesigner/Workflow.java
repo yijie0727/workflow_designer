@@ -125,28 +125,28 @@ public class Workflow {
             blockTypes = new Reflections(module.split(":")[1],classLoader).getTypesAnnotatedWith(BlockType.class);
 
         for(Class blockType:blockTypes){
-            //Instantiate block
-            Block block= new Block(blockType.newInstance(),this);
-            Annotation annotation = blockType.getAnnotation(BlockType.class);
-            Class<? extends Annotation> type = annotation.annotationType();
+                //Instantiate block
+                Block block= new Block(blockType.newInstance(),this);
+                Annotation annotation = blockType.getAnnotation(BlockType.class);
+                Class<? extends Annotation> type = annotation.annotationType();
 
-            //Load information from annotations
-            String blockTypeName = (String)type.getDeclaredMethod("type").invoke(annotation, (Object[])null);
-            String blockTypeFamily = (String)type.getDeclaredMethod("family").invoke(annotation, (Object[])null);
-            Boolean jarExecutable = (Boolean) type.getDeclaredMethod("runAsJar").invoke(annotation, (Object[])null);
-            String description = (String)type.getDeclaredMethod("description").invoke(annotation, (Object[])null);
-            block.setName(blockTypeName);
-            block.setFamily(blockTypeFamily);
-            block.setJarExecutable(jarExecutable);
-            block.setDescription(description);
+                //Load information from annotations
+                String blockTypeName = (String)type.getDeclaredMethod("type").invoke(annotation, (Object[])null);
+                String blockTypeFamily = (String)type.getDeclaredMethod("family").invoke(annotation, (Object[])null);
+                Boolean jarExecutable = (Boolean) type.getDeclaredMethod("runAsJar").invoke(annotation, (Object[])null);
+                String description = (String)type.getDeclaredMethod("description").invoke(annotation, (Object[])null);
+                block.setName(blockTypeName);
+                block.setFamily(blockTypeFamily);
+                block.setJarExecutable(jarExecutable);
+                block.setDescription(description);
 
-            if(moduleSource!=null)
-                block.setModule(moduleSource.get(blockType));
-            else{
-                block.setModule(module);
-            }
-            block.initialize();
-            blockDefinitions.add(block);
+                if(moduleSource!=null)
+                    block.setModule(moduleSource.get(blockType));
+                else{
+                    block.setModule(module);
+                }
+                block.initialize();
+                blockDefinitions.add(block);
 
         }
         return blockDefinitions;
@@ -200,8 +200,8 @@ public class Workflow {
                 Class<? extends Annotation> type = annotation.annotationType();
                 String blockTypeName = (String)type.getDeclaredMethod("type").invoke(annotation, (Object[])null);
                 if (blockObject.getString("type").equals(blockTypeName)){
-                    block = new Block(blockType.newInstance(),this);
-                    break;
+                        block = new Block(blockType.newInstance(),this);
+                        break;
                 }
             }
             if(block==null) {
@@ -301,7 +301,7 @@ public class Workflow {
 
                 Map<String,InputField>fields=new HashMap<>();
 
-
+                
                 //Check dependencies of waiting block
                 for (int i = 0; i < edgesArray.length(); i++) {
                     JSONObject edgeObject = edgesArray.getJSONObject(i);
@@ -432,23 +432,23 @@ public class Workflow {
         JSONArray connector1 = edgeObject.getJSONArray("connector1");
         JSONArray connector2 = edgeObject.getJSONArray("connector2");
 
-        InputField field;
-        if(fields.containsKey(connector2.getString(0))){
-            field = fields.get(connector2.getString(0));
+            InputField field;
+            if(fields.containsKey(connector2.getString(0))){
+                field = fields.get(connector2.getString(0));
 
-        }
-        else{
-            field=new InputField();
-            List<String>sourceParams = new ArrayList<>();
-            field.setSourceParam(sourceParams);
-            List<Integer>sourceBlocks = new ArrayList<>();
-            field.setSourceBlock(sourceBlocks);
-            field.setDestinationParam(connector2.getString(0));
-            fields.put(field.getDestinationParam(),field);
+            }
+            else{
+                field=new InputField();
+                List<String>sourceParams = new ArrayList<>();
+                field.setSourceParam(sourceParams);
+                List<Integer>sourceBlocks = new ArrayList<>();
+                field.setSourceBlock(sourceBlocks);
+                field.setDestinationParam(connector2.getString(0));
+                fields.put(field.getDestinationParam(),field);
 
-        }
-        field.getSourceParam().add(connector1.getString(0));
-        field.getSourceBlock().add(block1Id);
+            }
+            field.getSourceParam().add(connector1.getString(0));
+            field.getSourceBlock().add(block1Id);
 
 
         dependencies.put(block1Id, block1);
