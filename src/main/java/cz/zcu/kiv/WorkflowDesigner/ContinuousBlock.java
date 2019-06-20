@@ -42,7 +42,8 @@ public class ContinuousBlock {
     private ContinuousWorkFlow continuousWorkFlow;
     private Map<String, List<SourceOutput>> IOMap;
     private Object finalOutputObject;
-
+    private boolean complete;
+    private boolean stream = true; //set false if one of the inputs of this block is not stream in connectIO() method
 
 
     public ContinuousBlock(Object context, ContinuousWorkFlow continuousWorkFlow) {
@@ -78,10 +79,8 @@ public class ContinuousBlock {
      * connect the Input of this Block with all its SourceOutput of sourceBlocks
      * by setting the value of the Input using reflection
      *
-     * Since all the parameters are not the 8 primitive types, so this should be a reference type,  byte[] or other else
-     * and when the Source Outputs changed due to execution, input should also change automatically due to reflection
      */
-    public void connectIO() throws IllegalAccessException{
+    public void connectIO() throws IllegalAccessException, TypeMismatchException{
         logger.info(" ______ Connect all the Inputs of ContinuousBlock[ ID = "+this.id+", " +this.name+" ] with its SourceOutputs.");
 
         if(inputs == null || inputs.isEmpty()) return;
@@ -97,7 +96,11 @@ public class ContinuousBlock {
 
                 int sourceBlockID = sourceOutput.getSourceBlockID();
                 String sourceParam = sourceOutput.getSourceParam();
-                ContinuousBlock sourceBlock = indexBlocksMap.get(sourceBlockID);
+                ContinuousBlock sourceBlock = sourceOutput.getSourceBlock();
+
+
+                String outputType = "";
+                String inputType = "";
 
                 //get O
                 Field[] outputFields = sourceBlock.getContext().getClass().getDeclaredFields();
@@ -108,6 +111,7 @@ public class ContinuousBlock {
                     if (blockOutput != null) {
                         if (blockOutput.name().equals(sourceParam)) {
                             sourceOut = f.get(sourceBlock.getContext());
+                            outputType = blockOutput.type();
                             break;
                         }
                     }
@@ -123,10 +127,18 @@ public class ContinuousBlock {
                     if (blockInput != null) {
                         if (blockInput.name().equals(destinationParam)) {
                             f.set(this.context, sourceOut);
+                            inputType = blockInput.type();
                             break;
                         }
                     }
                 }
+
+                if(!outputType.equals(inputType)){
+                    logger.info("The output type of the source block is different from the input type of the destination block.");
+                    throw new TypeMismatchException(outputType, inputType);
+                }
+
+
             }
         }
 
@@ -156,6 +168,11 @@ public class ContinuousBlock {
 
             BlockInput blockInput = f.getAnnotation(BlockInput.class);
             if (blockInput != null){
+
+                if(!blockInput.type().equals(STREAM)){
+                    this.setStream(false);
+                }
+
                 String cardinality="";
                 if(blockInput.type().endsWith("[]")){
                     cardinality=WorkflowCardinality.MANY_TO_MANY;
@@ -429,4 +446,19 @@ public class ContinuousBlock {
         this.finalOutputObject = finalOutputObject;
     }
 
+    public boolean isComplete() {
+        return complete;
+    }
+
+    public void setComplete(boolean complete) {
+        this.complete = complete;
+    }
+
+    public boolean isStream() {
+        return stream;
+    }
+
+    public void setStream(boolean stream) {
+        this.stream = stream;
+    }
 }

@@ -14,6 +14,8 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.charset.Charset;
 import java.util.Date;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Callable;
 
 public class ContinuousTask implements Callable<Boolean> {
@@ -43,7 +45,7 @@ public class ContinuousTask implements Callable<Boolean> {
 
 
     @Override
-    public Boolean call() throws IllegalAccessException, IOException, InterruptedException, InvocationTargetException {
+    public Boolean call() throws IllegalAccessException, IOException, InterruptedException, InvocationTargetException, TypeMismatchException {
         logger.info(" _______________ start Callable call() for id = "+blockID +", name = "+currBlock.getName()+" _______________ ");
 
         //not execute the block execute method and return the thread if a block in the workflow already caught error
@@ -53,18 +55,34 @@ public class ContinuousTask implements Callable<Boolean> {
 
         //blocks with inputs
         if(currBlock.getInputs() != null && currBlock.getInputs().size() > 0 ) {
-            currBlock.connectIO();
 
-            while (!checkInputsReady()) {
-                logger.info(" __ Input not ready for "+currBlock.getId()+" "+currBlock.getName());
-                Thread.sleep(2000);
+            if(currBlock.isStream()){
+                //when input is stream
+                logger.info(" _______________  _______________  ______________block id = "+blockID +", name = "+currBlock.getName()+" deal with stream");
+
                 currBlock.connectIO();
+                while (!checkInputsReady()) {
+                    logger.info(" __ StreamInput not ready for "+currBlock.getId()+" "+currBlock.getName());
+                    Thread.sleep(1000);
+                    currBlock.connectIO();
+                }
+
+            } else {
+                //when input is not stream like primitive data, list, File
+                logger.info(" _______________  _______________  ______________block id = "+blockID +", name = "+currBlock.getName()+" deal with normal data type");
+
+                while (!checkSourceComplete()) {
+                    logger.info(" __ Normal data type Input not ready for "+currBlock.getId()+" "+currBlock.getName());
+                    Thread.sleep(1000);
+                }
             }
+
         }
 
         try{
             output = currBlock.blockExecute();
             currBlock.setFinalOutputObject(output);
+            currBlock.setComplete(true);
 
         } catch (Exception e){
             e.printStackTrace();
@@ -161,6 +179,13 @@ public class ContinuousTask implements Callable<Boolean> {
         return errorFlag[0];
     }
 
+    /**
+     * Only used when the blocks are dealt with the Stream(all the inputs of the destination blocks are stream)
+     * Then the block need not wait its sources block are executed, it can just fetch the output stream from its source
+     * And the source Stream is ready for the destination Stream as long as the outputStream is not null
+     *
+     * @return true if all its source blocks are completed
+     */
     public boolean checkInputsReady() throws IllegalAccessException, IOException{
         //check all the inputStreams of this block (already fetch that stream through reflection before the thread task call)
         Field[] inputFields = currBlock.getContext().getClass().getDeclaredFields();
@@ -179,6 +204,34 @@ public class ContinuousTask implements Callable<Boolean> {
 
         return true;
     }
+
+    /**
+     * Only used when the blocks are dealt with the primitive data like int, double ……
+     * Then the block must wait until its sources block are executed, otherwise cannot fetch the correct data
+     *
+     * @return true if all its source blocks are completed
+     */
+    public boolean checkSourceComplete() throws IllegalAccessException, TypeMismatchException{
+
+        Map<String, List<SourceOutput>> IOMap =currBlock.getIOMap();
+        for(String destinationParam : IOMap.keySet()){
+            List<SourceOutput> sourceOutputs = IOMap.get(destinationParam);
+            for(SourceOutput sourceOutput: sourceOutputs) {
+
+                ContinuousBlock sourceBlock = sourceOutput.getSourceBlock();
+                if(!sourceBlock.isComplete())
+                    return false;
+            }
+        }
+        currBlock.connectIO();
+        return true;
+    }
+
+
+
+
+
+
 
 
 }

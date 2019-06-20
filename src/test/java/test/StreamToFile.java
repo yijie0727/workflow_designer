@@ -10,13 +10,15 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 
+import static cz.zcu.kiv.WorkflowDesigner.Type.STREAM;
+
 
 @BlockType(type ="StreamToFile", family = "STREAM")
 public class StreamToFile {
 
 
 
-    @BlockInput(name = "InputStream", type = "STREAM")
+    @BlockInput(name = "InputStream", type = STREAM)
     private InputStream in;
 
     @BlockOutput(name = "OutputFile", type ="FILE")

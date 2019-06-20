@@ -211,18 +211,20 @@ public class ContinuousWorkFlow {
 
     /**
      * mapBlocksIO
-     * set Map<String, SourceOutput> IOMap for each Blocks according to the JSONArray edgeArray;
+     * set Map<String, List<SourceOutput></SourceOutput>> IOMap for each Blocks according to the JSONArray edgeArray;
      *
      */
     public void mapBlocksIO(JSONArray edgesArray){
+        logger.info("Set IOMap for each destination Blocks ");
 
         for(int i = 0; i<edgesArray.length(); i++){
             JSONObject edge = edgesArray.getJSONObject(i);
 
             int block1ID = edge.getInt("block1");
+            ContinuousBlock block1 = indexBlocksMap.get(block1ID);
             // ContinuousBlock block1 = indexBlocksMap.get(block1ID);
             String sourceParam = edge.getJSONArray("connector1").getString(0);
-            SourceOutput sourceOutput = new SourceOutput(block1ID, sourceParam);
+            SourceOutput sourceOutput = new SourceOutput(block1ID, block1, sourceParam);
 
             int block2ID = edge.getInt("block2");
             ContinuousBlock block2 = this.indexBlocksMap.get(block2ID);
