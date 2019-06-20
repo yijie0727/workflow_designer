@@ -90,43 +90,8 @@ public class WorkflowDesignerTest {
 
     @Test
     public void testFileToStreamToFile() throws IOException, NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException, FieldMismatchException, InterruptedException{
-        String json="{\n" +
-                "    \"edges\": [\n" +
-                "        {\n" +
-                "            \"id\": 1,\n" +
-                "            \"block1\": 1,\n" +
-                "            \"connector1\": [\n" +
-                "                \"STREAM\",\n" +
-                "                \"Output\"\n" +
-                "            ],\n" +
-                "            \"block2\": 2,\n" +
-                "            \"connector2\": [\n" +
-                "                \"STREAM\",\n" +
-                "                \"Input\"\n" +
-                "            ]\n" +
-                "        }\n" +
-                "    ],\n" +
-                "    \"blocks\": [\n" +
-                "        {\n" +
-                "            \"id\": 1,\n" +
-                "            \"x\": -472,\n" +
-                "            \"y\": -165,\n" +
-                "            \"type\": \"FileToStream\",\n" +
-                "            \"module\": \":test\",\n" +
-                "            \"values\": {\n" +
-                "                \"File\": \"/Users/yijie/Desktop/INCF/input.txt\"\n" +
-                "            }\n" +
-                "        },\n" +
-                "        {\n" +
-                "            \"id\": 2,\n" +
-                "            \"x\": -284,\n" +
-                "            \"y\": -154,\n" +
-                "            \"type\": \"StreamToFile\",\n" +
-                "            \"module\": \":test\",\n" +
-                "            \"values\": {}\n" +
-                "        }\n" +
-                "    ]\n" +
-                "}";
+        String json = FileUtils.readFileToString(new File("test_data/FileToStreamTest.json"), Charset.defaultCharset());
+
         JSONObject jsonObject = new JSONObject(json);
         File outputFile = File.createTempFile("testFileToStreamToFile",".json");
         outputFile.deleteOnExit();
@@ -139,7 +104,7 @@ public class WorkflowDesignerTest {
         moduleSource.put(classA, ":test");
         moduleSource.put(classB, ":test");
 
-        JSONArray jsonArray = new ContinuousWorkFlow(ClassLoader.getSystemClassLoader(), moduleSource, "").execute(jsonObject,"test_data",outputFile.getAbsolutePath());
+        JSONArray jsonArray = new ContinuousWorkFlow(ClassLoader.getSystemClassLoader(), moduleSource, null,"test_data").execute(jsonObject,"test_data",outputFile.getAbsolutePath());
         assert jsonArray !=null;
         assert jsonArray.length() == 2;
     }

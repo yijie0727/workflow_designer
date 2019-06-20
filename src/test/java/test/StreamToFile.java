@@ -16,26 +16,31 @@ public class StreamToFile {
 
 
 
-    @BlockInput(name = "Input", type = "STREAM")
+    @BlockInput(name = "InputStream", type = "STREAM")
     private InputStream in;
 
-    @BlockOutput(name = "Output", type ="FILE")
+    @BlockOutput(name = "OutputFile", type ="FILE")
     private File outputFile;
 
     @BlockExecute
-    public void process(){
+    public File process(){
 
-        outputFile = new File("/Users/yijie/Desktop/INCF/stream.txt");
+        outputFile = new File("test_data/streamTest.txt");
 
         try{
             OutputStream out = new FileOutputStream(outputFile);
-            byte[] bytes= new byte[1024];
+            byte[] bytes= new byte[43];
 
             while(in.read(bytes)!=-1){
 
                 out.write(bytes);
                 out.flush();
             }
+
+            String s = "\nThis is the Test of Output of StreamToFile.";
+            out.write(s.getBytes());
+            out.flush();
+
             out.close();
             in.close();
 
@@ -43,6 +48,7 @@ public class StreamToFile {
             e.printStackTrace();
         }
 
+        return outputFile;
 
     }
 

@@ -1,13 +1,19 @@
 package cz.zcu.kiv.WorkflowDesigner;
 
 import cz.zcu.kiv.WorkflowDesigner.Annotations.BlockInput;
+import cz.zcu.kiv.WorkflowDesigner.Visualizations.PlotlyGraphs.Graph;
+import cz.zcu.kiv.WorkflowDesigner.Visualizations.Table;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.json.JSONObject;
 
 import java.io.*;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
+import java.nio.charset.Charset;
+import java.util.Date;
 import java.util.concurrent.Callable;
 
 public class ContinuousTask implements Callable<Boolean> {
@@ -17,20 +23,27 @@ public class ContinuousTask implements Callable<Boolean> {
 
     private int blockID;
     private ContinuousBlock currBlock;
+    private JSONObject blockObject;
+    private Object output;       //return value of the blockExecute method
+    private boolean error;       //error of the this block execution
     private StringBuilder stdErr = new StringBuilder();
-    private Object output;
-    private boolean[] errorFlag;
+    private StringBuilder stdOut = new StringBuilder();
+    private String outputFolder;
 
-    public ContinuousTask(int blockID, ContinuousBlock currBlock, boolean[] errorFlag) {
+    private boolean[] errorFlag; //errorFlag of the whole workFlow
+
+
+    public ContinuousTask(int blockID, ContinuousBlock currBlock, boolean[] errorFlag, JSONObject blockObject, String outputFolder) {
         this.blockID = blockID;
         this.currBlock = currBlock;
         this.errorFlag = errorFlag;
+        this.blockObject = blockObject;
+        this.outputFolder = outputFolder;
     }
 
 
     @Override
     public Boolean call() throws IllegalAccessException, IOException, InterruptedException, InvocationTargetException {
-
         logger.info(" _______________ start Callable call() for id = "+blockID +", name = "+currBlock.getName()+" _______________ ");
 
         //not execute the block execute method and return the thread if a block in the workflow already caught error
@@ -54,25 +67,93 @@ public class ContinuousTask implements Callable<Boolean> {
             currBlock.setFinalOutputObject(output);
 
         } catch (Exception e){
-
             e.printStackTrace();
+            error = true;
             stdErr.append(ExceptionUtils.getRootCauseMessage(e)+" \n");
             for(String trace:ExceptionUtils.getRootCauseStackTrace(e)){
                 stdErr.append(trace+" \n");
             }
 
-
-            currBlock.setError(true);
             synchronized (errorFlag){ errorFlag[0] = true; }
 
             logger.error("Error executing id = "+blockID +", name = "+ currBlock.getName()+" Block natively", e);
             throw e;
         }
-        currBlock.setStdErr(stdErr.toString());
-        currBlock.setCompleted(true);
+
+
+        updateJSON();
+
         return false;
     }
 
+
+    //update the JSON file of "blocks"
+    public void updateJSON() throws IOException{
+
+        blockObject.put("error", error);
+        blockObject.put("stderr", stdErr);
+        blockObject.put("stdout", stdOut);
+        blockObject.put("completed", true);
+
+        JSONObject JSONOutput = new JSONObject();
+        if(output==null){
+            JSONOutput = null;
+        }  else if (output.getClass().equals(String.class)){
+
+            JSONOutput.put("type","STRING");
+            JSONOutput.put("value",output);
+
+        }  else if (output.getClass().equals(File.class)){
+
+            File file = (File) output;
+            String destinationFileName="file_"+new Date().getTime()+"_"+file.getName();
+            FileUtils.moveFile(file, new File(outputFolder + File.separator + destinationFileName));
+            JSONOutput.put("type", "FILE");
+            JSONObject fileObject = new JSONObject();
+            fileObject.put("title", file.getName());
+            fileObject.put("filename", destinationFileName);
+            JSONOutput.put("value", fileObject);
+
+        }else if (output.getClass().equals(Table.class)){
+
+            Table table=(Table)output;
+            JSONOutput.put("type", "TABLE");
+            JSONOutput.put("value", table.toJSON());
+            File file =File.createTempFile("temp_",".csv");
+            FileUtils.writeStringToFile(file,table.toCSV(), Charset.defaultCharset());
+            String destinationFileName = "table_" + new Date().getTime() + ".csv";
+            FileUtils.moveFile(file, new File(outputFolder + File.separator + destinationFileName));
+            JSONObject fileObject=new JSONObject();
+            fileObject.put("title", destinationFileName);
+            fileObject.put("filename", destinationFileName);
+            JSONOutput.put("tableFileValue", fileObject);
+
+        }
+        else if (output.getClass().equals(Graph.class)){
+
+            Graph graph=(Graph)output;
+            JSONOutput.put("type", "GRAPH");
+            JSONOutput.put("value", graph.toJSON());
+            File file =File.createTempFile("temp_",".json");
+            FileUtils.writeStringToFile(file, graph.toJSON().toString(4), Charset.defaultCharset());
+            String destinationFileName = "graph_"+ new Date().getTime() + ".json";
+            FileUtils.moveFile(file, new File(outputFolder + File.separator + destinationFileName));
+            JSONObject fileObject=new JSONObject();
+            fileObject.put("title", destinationFileName);
+            fileObject.put("filename", destinationFileName);
+            JSONOutput.put("graphFileValue", fileObject);
+
+        }
+        else{
+
+            JSONOutput.put("type","");
+            JSONOutput.put("value",output.toString());
+
+        }
+
+        if (JSONOutput != null)
+            blockObject.put("output", JSONOutput);
+    }
 
 
     //if error = true, immediately end the thread
@@ -89,8 +170,8 @@ public class ContinuousTask implements Callable<Boolean> {
             BlockInput blockInput = f.getAnnotation(BlockInput.class);
 
             if (blockInput != null){
-                Object stream = f.get(currBlock.getContext());
-                if (stream == null) {
+                Object input = f.get(currBlock.getContext());
+                if (input == null) {
                     return false;
                 }
             }
@@ -100,21 +181,4 @@ public class ContinuousTask implements Callable<Boolean> {
     }
 
 
-
-
-    public int getBlockID() {
-        return blockID;
-    }
-
-    public void setBlockID(int blockID) {
-        this.blockID = blockID;
-    }
-
-    public ContinuousBlock getCurrBlock() {
-        return currBlock;
-    }
-
-    public void setCurrBlock(ContinuousBlock currBlock) {
-        this.currBlock = currBlock;
-    }
 }
