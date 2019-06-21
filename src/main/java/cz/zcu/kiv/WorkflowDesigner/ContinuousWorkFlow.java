@@ -185,6 +185,8 @@ public class ContinuousWorkFlow {
             for(Class blockClass : blockClasses){
 
                 Annotation annotation = blockClass.getAnnotation(BlockType.class);
+                if(annotation == null) continue;
+                logger.info("annotation = "+annotation );
                 Class<? extends Annotation> blockType = annotation.annotationType();
                 String blockTypeName = (String)blockType.getDeclaredMethod("type").invoke(annotation);
 
