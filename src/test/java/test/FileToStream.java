@@ -9,6 +9,8 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
 
+import static cz.zcu.kiv.WorkflowDesigner.Type.STREAM;
+
 
 @BlockType(type ="FileToStream", family = "STREAM")
 public class FileToStream {
@@ -16,7 +18,7 @@ public class FileToStream {
     @BlockProperty(name = "File", type = "FILE")
     private File fileInput;
 
-    @BlockOutput(name = "Output", type = "STREAM")
+    @BlockOutput(name = "FileStream", type = STREAM)
     private InputStream output;
 
     @BlockExecute

@@ -6,6 +6,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.reflections.Reflections;
 
 import java.io.File;
 import java.io.IOException;
@@ -21,7 +22,7 @@ public class ContinuousWorkFlow {
 
     private static Log logger = LogFactory.getLog(ContinuousWorkFlow.class);
 
-    //private String jarDirectory;
+    private String jarDirectory;
     private String remoteDirectory; //File location where the user upload their file waiting to be execute
     private ClassLoader classLoader;
     private Map<Class,String> moduleSource; //initialize workflow
@@ -30,34 +31,87 @@ public class ContinuousWorkFlow {
     private List<ContinuousBlock> blockDefinitions;// all the blocks from one module only used for front end
 
     private Map<Integer, ContinuousBlock> indexBlocksMap;
-    private boolean[] errorFlag = new boolean[1]; //denote whether the workFlow completed successfully or not
+    private boolean[] errorFlag = new boolean[1]; //denote whether the whole workFlow completed successfully or not
 
     /**
      * Constructor for building BlockTrees for front-End  -- (Front-End call: initializeBlocks)
      */
-    public ContinuousWorkFlow(ClassLoader classLoader,  String module, String remoteDirectory) {
+    public ContinuousWorkFlow(ClassLoader classLoader,  String module, String jarDirectory, String remoteDirectory) {
         this.remoteDirectory = remoteDirectory;
         this.classLoader = classLoader;
         this.module = module;
+        this.jarDirectory = jarDirectory;
     }
 
     /**
      * Constructor to execute the Continuous WorkFlow -- (Front-End call: execute)
      */
-    public ContinuousWorkFlow(ClassLoader classLoader, Map<Class, String> moduleSource, String remoteDirectory) {
+    public ContinuousWorkFlow(ClassLoader classLoader, Map<Class, String> moduleSource, String jarDirectory, String remoteDirectory) {
         this.remoteDirectory = remoteDirectory;
         this.classLoader = classLoader;
         this.moduleSource = moduleSource;
+        this.jarDirectory = jarDirectory;
     }
 
 
     /**
-     * execute
-     * @param jObject               SONObject contains Blocks and Edges info
-     * @param outputFolder          Folder to save the output File
-     * @param workflowOutputFile    File workflowOutputFile = File.createTempFile("job_"+getId(),".json",new File(WORKING_DIRECTORY));
-     *                                  -- > File to put the Blocks JSONArray info with the output info, stdout, stderr, error info after the execution
+     * initializeBlocks
+     * prepare JSON for the Front end to form the blocks tree
+     *
      */
+    public JSONArray initializeBlocks() throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
+        initializeBlockDefinitions();
+        JSONArray blocksArray=new JSONArray();
+        for(ContinuousBlock block : this.blockDefinitions){
+            //Write JS file description of block to array
+            blocksArray.put(block.toJSON());
+        }
+        logger.info("Initialized "+blocksArray.length()+" blocks");
+        return blocksArray;
+    }
+
+    public void initializeBlockDefinitions() throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
+        if(blockDefinitions !=null) return;
+
+        List<ContinuousBlock> blocksList = new ArrayList<>();
+        Set<Class<?>> blockClasses = new Reflections(module.split(":")[1], classLoader).getTypesAnnotatedWith(BlockType.class);
+        for(Class blockClass : blockClasses){
+
+            ContinuousBlock currBlock = createBlockInstance(blockClass, module);
+            currBlock.initializeIO();
+            blocksList.add(currBlock);
+
+        }
+        setBlockDefinitions(blocksList);
+    }
+
+    private ContinuousBlock createBlockInstance(Class blockClass, String moduleStr) throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
+        ContinuousBlock currBlock = new ContinuousBlock(blockClass.newInstance(), this);
+
+        Annotation annotation = blockClass.getAnnotation(BlockType.class);
+        Class<? extends Annotation> blockType = annotation.annotationType();
+
+        String blockTypeName = (String)blockType.getDeclaredMethod("type").invoke(annotation);
+        String blockTypeFamily = (String)blockType.getDeclaredMethod("family").invoke(annotation);
+        String description = (String)blockType.getDeclaredMethod("description").invoke(annotation);
+        Boolean jarExecutable = (Boolean) blockType.getDeclaredMethod("runAsJar").invoke(annotation);
+
+        currBlock.setName(blockTypeName);
+        currBlock.setFamily(blockTypeFamily);
+        currBlock.setModule(moduleStr);
+        currBlock.setDescription(description);
+        currBlock.setJarExecutable(jarExecutable);
+
+        return currBlock;
+    }
+
+        /**
+         * execute
+         * @param jObject               SONObject contains Blocks and Edges info
+         * @param outputFolder          Folder to save the output File
+         * @param workflowOutputFile    File workflowOutputFile = File.createTempFile("job_"+getId(),".json",new File(WORKING_DIRECTORY));
+         *                                  -- > File to put the Blocks JSONArray info with the output info, stdout, stderr, error info after the execution
+         */
     public JSONArray execute(JSONObject jObject, String outputFolder, String workflowOutputFile) throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException, InstantiationException, FieldMismatchException, InterruptedException {
         logger.info(" Start Continuous WorkFlow Execution …… ");
 
@@ -76,9 +130,11 @@ public class ContinuousWorkFlow {
         int poolSize  = blocksArray.length();
         int queueSize = blocksArray.length();
         ThreadPoolExecutor workFlowThreadPool = new ThreadPoolExecutor(poolSize, poolSize, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<Runnable>(queueSize), new ThreadPoolExecutor.AbortPolicy());
-        for(int blockID: indexBlocksMap.keySet()){
+        for(int i = 0; i<blocksArray.length(); i++){
+            JSONObject blockObject = blocksArray.getJSONObject(i);
+            int blockID = blockObject.getInt("id");
             ContinuousBlock currBlock = indexBlocksMap.get(blockID);
-            ContinuousTask blockExecuteTask = new ContinuousTask(blockID, currBlock, errorFlag);
+            ContinuousTask blockExecuteTask = new ContinuousTask(blockID, currBlock, errorFlag, blockObject, outputFolder);
             workFlowThreadPool.submit(blockExecuteTask);
         }
         workFlowThreadPool.shutdown();
@@ -89,64 +145,13 @@ public class ContinuousWorkFlow {
         logger.info("……………………………………………………………………………………………………  ShutDown the Thread Pool successfully. Close all the taskThreads of this workFlow. …………………………………………………………………………………………………………………………………………………………… ");
 
 
-        boolean completeFlag = true;
-        //update the blocksArray JSON
-        for(int i = 0; i<blocksArray.length(); i++){
-
-            JSONObject blockObject = blocksArray.getJSONObject(i);
-            int blockID = blockObject.getInt("id");
-            ContinuousBlock currBlock = indexBlocksMap.get(blockID);
-
-            boolean error = currBlock.isError();
-            String stdErr = currBlock.getStdErr();
-            Object output = currBlock.getFinalOutputObject();
-
-            if(!error){
-                completeFlag = false;
-            }
-
-
-            //Assemble the output JSON-->only add a file case(for other data types, to be continued)
-            JSONObject JSONOutput = new JSONObject();
-            if(output==null){
-                JSONOutput = null;
-            }  else if (output.getClass().equals(String.class)){
-
-                JSONOutput.put("type","STRING");
-                JSONOutput.put("value",output);
-
-            }  else if (output.getClass().equals(File.class)){
-
-                File file = (File) output;
-                String destinationFileName="file_"+new Date().getTime()+"_"+file.getName();
-                FileUtils.moveFile(file,new File(outputFolder+File.separator+destinationFileName));
-                JSONOutput.put("type","FILE");
-                JSONObject fileObject=new JSONObject();
-                fileObject.put("title",file.getName());
-                fileObject.put("filename",destinationFileName);
-                JSONOutput.put("value",fileObject);
-
-            }
-
-            if (JSONOutput != null)
-                blockObject.put("output", JSONOutput);
-
-            blockObject.put("error", error);
-            blockObject.put("stdErr", stdErr);
-
-            if(currBlock.isCompleted())
-                blockObject.put("completed", true);
-
-        }
-
-        //Save Present state of output to file
+        //Save Present JSON (with outputs, errors) to the original file
         if(workflowOutputFile!=null){
             File workflowOutput=new File(workflowOutputFile);
-            FileUtils.writeStringToFile(workflowOutput,blocksArray.toString(4), Charset.defaultCharset());
+            FileUtils.writeStringToFile(workflowOutput, blocksArray.toString(4), Charset.defaultCharset());
         }
 
-
-        if(!completeFlag)
+        if(!errorFlag[0])
             logger.info( "Workflow Execution completed successfully!");
         else
             logger.error("Workflow Execution failed!");
@@ -166,8 +171,6 @@ public class ContinuousWorkFlow {
         logger.info("initialize all the related ContinuousBlocks(including I/O/properties initialization) in this workFlow and set the idBlocksMap");
         Map<Integer, ContinuousBlock> idBlocksMap = new HashMap<>();
 
-        // Map<Integer, >
-
         for(int i = 0; i<blocksArray.length(); i++){
             ContinuousBlock currBlock = null;
 
@@ -186,14 +189,8 @@ public class ContinuousWorkFlow {
                 String blockTypeName = (String)blockType.getDeclaredMethod("type").invoke(annotation);
 
                 if(blockTypeName.equals(blockTypeStr)){
-                    currBlock = new ContinuousBlock(blockClass.newInstance(), this);
-                    String blockTypeFamily = (String)blockType.getDeclaredMethod("family").invoke(annotation);
-                    String description = (String)blockType.getDeclaredMethod("description").invoke(annotation);
+                    currBlock = createBlockInstance(blockClass, module);
                     currBlock.setId(id);
-                    currBlock.setModule(module);
-                    currBlock.setName(blockTypeName);
-                    currBlock.setFamily(blockTypeFamily);
-                    currBlock.setDescription(description);
                     break;
                 }
             }
@@ -206,7 +203,6 @@ public class ContinuousWorkFlow {
             currBlock.initializeIO();
             currBlock.assignProperties(blockObject);
 
-
             idBlocksMap.put(id, currBlock);
         }
         setIndexBlocksMap(idBlocksMap);
@@ -215,31 +211,34 @@ public class ContinuousWorkFlow {
 
     /**
      * mapBlocksIO
-     * set Map<String, SourceOutput> IOMap for each Blocks according to the JSONArray edgeArray;
+     * set Map<String, List<SourceOutput></SourceOutput>> IOMap for each Blocks according to the JSONArray edgeArray;
      *
      */
     public void mapBlocksIO(JSONArray edgesArray){
+        logger.info("Set IOMap for each destination Blocks ");
 
         for(int i = 0; i<edgesArray.length(); i++){
             JSONObject edge = edgesArray.getJSONObject(i);
 
             int block1ID = edge.getInt("block1");
+            ContinuousBlock block1 = indexBlocksMap.get(block1ID);
             // ContinuousBlock block1 = indexBlocksMap.get(block1ID);
-            String sourceParam = edge.getJSONArray("connector1").getString(1);
-            SourceOutput sourceOutput = new SourceOutput(block1ID, sourceParam);
+            String sourceParam = edge.getJSONArray("connector1").getString(0);
+            SourceOutput sourceOutput = new SourceOutput(block1ID, block1, sourceParam);
 
             int block2ID = edge.getInt("block2");
             ContinuousBlock block2 = this.indexBlocksMap.get(block2ID);
-            String destinationParam = edge.getJSONArray("connector2").getString(1);
+            String destinationParam = edge.getJSONArray("connector2").getString(0);
 
-            Map<String, SourceOutput> IOMap =block2.getIOMap();
-            IOMap.put(destinationParam, sourceOutput);
-            block2.setIOMap(IOMap);// can comment this line
+            Map<String, List<SourceOutput>> IOMap =block2.getIOMap();
+            if(!IOMap.containsKey(destinationParam))
+                IOMap.put(destinationParam, new ArrayList<SourceOutput>());
+
+            IOMap.get(destinationParam).add(sourceOutput);
+            block2.setIOMap(IOMap);
         }
 
     }
-
-
 
 
 
@@ -291,4 +290,11 @@ public class ContinuousWorkFlow {
         this.indexBlocksMap = indexBlocksMap;
     }
 
+    public String getJarDirectory() {
+        return jarDirectory;
+    }
+
+    public void setJarDirectory(String jarDirectory) {
+        this.jarDirectory = jarDirectory;
+    }
 }

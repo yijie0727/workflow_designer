@@ -1,0 +1,37 @@
+{
+  "edges": [
+    {
+      "id": 1,
+      "block1": 1,
+      "connector1": [
+        "FileStream",
+        "Output"
+      ],
+      "block2": 2,
+      "connector2": [
+        "InputStream",
+        "Input"
+      ]
+    }
+  ],
+  "blocks": [
+    {
+      "id": 1,
+      "x": -472,
+      "y": -165,
+      "type": "FileToStream",
+      "module": "test.jar:test",
+      "values": {
+        "File": "input.txt"
+      }
+    },
+    {
+      "id": 2,
+      "x": -284,
+      "y": -154,
+      "type": "StreamToFile",
+      "module": "test.jar:test",
+      "values": {}
+    }
+  ]
+}
