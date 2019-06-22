@@ -144,7 +144,7 @@ public class ContinuousTask implements Callable<Boolean> {
             JSONObject fileObject=new JSONObject();
             fileObject.put("title", destinationFileName);
             fileObject.put("filename", destinationFileName);
-            JSONOutput.put("tableFileValue", fileObject);
+            JSONOutput.put("value", fileObject);
 
         }
         else if (output.getClass().equals(Graph.class)){
@@ -159,7 +159,7 @@ public class ContinuousTask implements Callable<Boolean> {
             JSONObject fileObject=new JSONObject();
             fileObject.put("title", destinationFileName);
             fileObject.put("filename", destinationFileName);
-            JSONOutput.put("graphFileValue", fileObject);
+            JSONOutput.put("value", fileObject);
 
         }
         else{
