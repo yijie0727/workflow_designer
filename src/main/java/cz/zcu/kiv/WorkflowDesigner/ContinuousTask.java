@@ -49,9 +49,7 @@ public class ContinuousTask implements Callable<Boolean> {
         logger.info(" _______________ start Callable call() for id = "+blockID +", name = "+currBlock.getName()+" _______________ ");
 
         //not execute the block execute method and return the thread if a block in the workflow already caught error
-        if(checkError()){
-            return false;
-        }
+        if(errorFlag[0]) return false;
 
         //blocks with inputs
         if(currBlock.getInputs() != null && currBlock.getInputs().size() > 0 ) {
@@ -62,6 +60,7 @@ public class ContinuousTask implements Callable<Boolean> {
 
                 currBlock.connectIO();
                 while (!checkInputsReady()) {
+                    if(errorFlag[0]) return false;
                     logger.info(" __ StreamInput not ready for "+currBlock.getId()+" "+currBlock.getName());
                     Thread.sleep(1000);
                     currBlock.connectIO();
@@ -72,6 +71,7 @@ public class ContinuousTask implements Callable<Boolean> {
                 logger.info(" _______________  _______________  ______________block id = "+blockID +", name = "+currBlock.getName()+" deal with normal data type");
 
                 while (!checkSourceComplete()) {
+                    if(errorFlag[0]) return false;
                     logger.info(" __ Normal data type Input not ready for "+currBlock.getId()+" "+currBlock.getName());
                     Thread.sleep(1000);
                 }
@@ -79,10 +79,14 @@ public class ContinuousTask implements Callable<Boolean> {
 
         }
 
+        //check errorFlag again, if errorFlag = true, immediately end the thread
+        if(errorFlag[0]) return false;
+
         try{
             output = currBlock.blockExecute();
             currBlock.setFinalOutputObject(output);
             currBlock.setComplete(true);
+            updateJSON();
 
         } catch (Exception e){
             e.printStackTrace();
@@ -93,13 +97,12 @@ public class ContinuousTask implements Callable<Boolean> {
             }
 
             synchronized (errorFlag){ errorFlag[0] = true; }
+            updateJSON();
 
             logger.error("Error executing id = "+blockID +", name = "+ currBlock.getName()+" Block natively", e);
             throw e;
         }
 
-
-        updateJSON();
 
         return false;
     }
@@ -174,10 +177,7 @@ public class ContinuousTask implements Callable<Boolean> {
     }
 
 
-    //if error = true, immediately end the thread
-    public boolean checkError(){
-        return errorFlag[0];
-    }
+
 
     /**
      * Only used when the blocks are dealt with the Stream(all the inputs of the destination blocks are stream)
