@@ -1,23 +1,23 @@
 package cz.zcu.kiv.WorkflowDesigner;
 
-import cz.zcu.kiv.WorkflowDesigner.Annotations.BlockExecute;
-import cz.zcu.kiv.WorkflowDesigner.Annotations.BlockInput;
-import cz.zcu.kiv.WorkflowDesigner.Annotations.BlockOutput;
-import cz.zcu.kiv.WorkflowDesigner.Annotations.BlockProperty;
+import cz.zcu.kiv.WorkflowDesigner.Annotations.*;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.SerializationUtils;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.reflections.Reflections;
 
-import java.io.File;
+import java.io.*;
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.nio.charset.Charset;
+import java.util.*;
 
 import static cz.zcu.kiv.WorkflowDesigner.Type.STREAM;
 
@@ -52,11 +52,44 @@ public class ContinuousBlock {
     }
 
 
+    public Object blockExecute(StringBuilder stdOut, StringBuilder stdErr) throws Exception {
+        logger.info("Executing block id = "+ getId() +", name = "+getName());
 
-    /**
-     *  block execute natively(without execute Jar)
-     */
-    public Object blockExecute() throws IllegalAccessException, InvocationTargetException {
+        Object output;
+
+        if(isJarExecutable() && continuousWorkFlow.getJarDirectory()!=null && !stream){
+            //Execute block as an external JAR file for normal data
+
+            BlockData blockData = this.connectIO();
+            output = executeAsJar(blockData, stdOut, stdErr);
+        }
+        else{
+            try {
+                //Execute block natively in the current class loader for stream data
+                output = executeInNative();
+            }
+            catch (Exception e){
+                e.printStackTrace();
+                stdErr.append(ExceptionUtils.getRootCauseMessage(e)+" \n");
+                for(String trace:ExceptionUtils.getRootCauseStackTrace(e)){
+                    stdErr.append(trace+" \n");
+                }
+                logger.error("Error executing "+getName()+" Block natively",e);
+                throw e;
+            }
+        }
+
+        setFinalOutputObject(output);
+        setComplete(true);
+        logger.info("Execution block id = "+ getId() +", name = "+getName()+ " block completed successfully");
+        return output;
+    }
+
+
+        /**
+         *  block execute natively(without execute Jar)
+         */
+    public Object executeInNative() throws IllegalAccessException, InvocationTargetException {
         logger.info("Natively Executing a block:  id-"+getId()+", name-"+getName());
 
         Object output = null;
@@ -67,11 +100,108 @@ public class ContinuousBlock {
                 break;
             }
         }
-
-        setFinalOutputObject(output);
+        logger.info("Finish natively execute the block:  id-"+getId()+", name-"+getName());
         return output;
     }
 
+    /**
+     * Execute block externally as a JAR
+     *
+     * @param blockData Serializable BlockData model representing all the data needed by a block to execute
+     * @param stdOut Standard Output Stream
+     * @param stdErr Standard Error Stream
+     * @return output returned by BlockExecute Method
+     * @throws Exception when output file is not created
+     */
+    private Object executeAsJar(BlockData blockData, StringBuilder stdOut, StringBuilder stdErr) throws Exception {
+        logger.info("Executing id = "+ getId() +", name = "+getName()+" as a JAR");
+
+        Object output;
+        try {
+            String fileName = "obj_" + new Date().getTime() ;
+            File inputFile=new File(continuousWorkFlow.getJarDirectory()+File.separator+fileName+".in");
+            File outputFile =new File(continuousWorkFlow.getJarDirectory()+File.separator+fileName+".out");
+
+            //Serialize and write BlockData object to a file
+            FileOutputStream fos = new FileOutputStream(inputFile);
+            ObjectOutputStream oos = new ObjectOutputStream(fos);
+            oos.writeObject(blockData);
+            oos.close();
+
+            File jarDirectory = new File(continuousWorkFlow.getJarDirectory());
+            jarDirectory.mkdirs();
+            String jarFilePath = jarDirectory.getAbsolutePath()+File.separator+getModule().split(":")[0];
+            File jarFile = new File(jarFilePath);
+
+            //Calling jar file externally with entry point at the Block's main method
+            String defaultVmArgs = "-Xmx1G";
+            String vmargs = System.getProperty("workflow.designer.vm.args");
+            vmargs = vmargs != null ? vmargs : defaultVmArgs;
+            String[]args=new String[]{"java", vmargs, "-cp",jarFile.getAbsolutePath() ,"cz.zcu.kiv.WorkflowDesigner.ContinuousBlock",inputFile.getAbsolutePath(),outputFile.getAbsolutePath(),getModule().split(":")[1]};
+            logger.info("Passing arguments" + Arrays.toString(args));
+            ProcessBuilder pb = new ProcessBuilder(args);
+            //Store output and error streams to files
+            logger.info("Executing jar file "+jarFilePath);
+            File stdOutFile = new File("std_output.log");
+            pb.redirectOutput(stdOutFile);
+            File stdErrFile = new File("std_error.log");
+            pb.redirectError(stdErrFile);
+            Process ps = pb.start();
+            ps.waitFor();
+            stdOut.append(FileUtils.readFileToString(stdOutFile, Charset.defaultCharset()));
+            String processErr =FileUtils.readFileToString(stdErrFile,Charset.defaultCharset());
+            stdErr.append(processErr);
+            InputStream is=ps.getErrorStream();
+            byte b[]=new byte[is.available()];
+            is.read(b,0,b.length);
+            String errorString = new String(b);
+            if(!errorString.isEmpty()){
+                logger.error(errorString);
+                stdErr.append(errorString);
+            }
+
+            is=ps.getInputStream();
+            b=new byte[is.available()];
+            is.read(b,0,b.length);
+            String outputString = new String(b);
+            if(!outputString.isEmpty()){
+                logger.info(outputString);
+                stdOut.append(outputString);
+            }
+
+            FileUtils.deleteQuietly(inputFile);
+
+            if(outputFile.exists()){
+                FileInputStream fis = new FileInputStream(outputFile);
+                ObjectInputStream ois = new ObjectInputStream(fis);
+                blockData = (BlockData) ois.readObject();
+                ois.close();
+                output=blockData.getProcessOutput();
+                FileUtils.deleteQuietly(outputFile);
+                for (Field f: context.getClass().getDeclaredFields()) {
+                    f.setAccessible(true);
+                    BlockOutput blockOutput = f.getAnnotation(BlockOutput.class);
+                    if (blockOutput != null) {
+                        f.set(context,blockData.getOutput().get(blockOutput.name()));
+                    }
+                }
+            }
+            else{
+                String err = "Output file does not exist";
+                if(processErr != null && !processErr.isEmpty()){
+                    err = processErr;
+                }
+                throw new Exception(err);
+            }
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+            stdErr.append(org.apache.commons.lang3.exception.ExceptionUtils.getStackTrace(e));
+            logger.error("Error executing Jar file", e);
+            throw e;
+        }
+        return output;
+    }
 
 
 
@@ -80,29 +210,42 @@ public class ContinuousBlock {
      * by setting the value of the Input using reflection
      *
      */
-    public void connectIO() throws IllegalAccessException, TypeMismatchException{
+    public BlockData connectIO() throws IllegalAccessException, TypeMismatchException{
         logger.info(" ______ Connect all the Inputs of ContinuousBlock[ ID = "+this.id+", " +this.name+" ] with its SourceOutputs.");
+        BlockData blockData = new BlockData(getName());//for normal data
 
-        if(inputs == null || inputs.isEmpty()) return;
+        if(!stream){
+            //Assign properties specific to blockData serialized object
+            for (Field f: context.getClass().getDeclaredFields()) {
+                f.setAccessible(true);
+
+                BlockProperty blockProperty = f.getAnnotation(BlockProperty.class);
+                if (blockProperty != null) {
+                    if(blockProperty.type().equals(Type.FILE)){
+                        blockData.getProperties().put(blockProperty.name(), new File(continuousWorkFlow.getRemoteDirectory()+File.separator+f.get(context)));
+                    }
+                    else blockData.getProperties().put(blockProperty.name(), f.get(context));
+                }
+            }
+        }
+
+        if(inputs == null || inputs.isEmpty()) return blockData;
 
         Map<Integer, ContinuousBlock> indexBlocksMap = continuousWorkFlow.getIndexBlocksMap();
         for(String destinationParam : IOMap.keySet()){
-            Object sourceOut = null;
 
-            //get SourceBlock
+            //get SourceBlocks if it is list[]
             List<SourceOutput> sourceOutputs = IOMap.get(destinationParam);
+            List<Object> components=new ArrayList<>();
 
+            //get O
             for(SourceOutput sourceOutput: sourceOutputs) {
+                Object sourceOut = null;
 
                 int sourceBlockID = sourceOutput.getSourceBlockID();
                 String sourceParam = sourceOutput.getSourceParam();
                 ContinuousBlock sourceBlock = sourceOutput.getSourceBlock();
 
-
-                String outputType = "";
-                String inputType = "";
-
-                //get O
                 Field[] outputFields = sourceBlock.getContext().getClass().getDeclaredFields();
                 for (Field f : outputFields) {
                     f.setAccessible(true);
@@ -111,37 +254,41 @@ public class ContinuousBlock {
                     if (blockOutput != null) {
                         if (blockOutput.name().equals(sourceParam)) {
                             sourceOut = f.get(sourceBlock.getContext());
-                            outputType = blockOutput.type();
                             break;
                         }
                     }
                 }
+                components.add(sourceOut);
+            }
 
-                //get I
-                Field[] inputFields = this.context.getClass().getDeclaredFields();
-                for (Field f : inputFields) {
-                    f.setAccessible(true);
+            //get I
+            Field[] inputFields = this.context.getClass().getDeclaredFields();
+            for (Field f : inputFields) {
+                f.setAccessible(true);
 
-                    BlockInput blockInput = f.getAnnotation(BlockInput.class);
+                BlockInput blockInput = f.getAnnotation(BlockInput.class);
 
-                    if (blockInput != null) {
-                        if (blockInput.name().equals(destinationParam)) {
-                            f.set(this.context, sourceOut);
-                            inputType = blockInput.type();
-                            break;
+                if (blockInput != null) {
+                    if (blockInput.name().equals(destinationParam)) {
+                        if(!blockInput.type().endsWith("[]")){ // input not comes from multiple outputs
+                            f.set(this.context, components.get(0));
+                            blockData.getInput().put(destinationParam, components.get(0));
+
+                        } else {// input comes from multiple outputs
+                            if(f.getType().isArray()){
+                                throw new IllegalAccessException("Arrays not supported, Use Lists Instead");
+                            }
+                            f.set(context,f.getType().cast(components));
+                            blockData.getInput().put(destinationParam, components);
+
                         }
+                        break;
                     }
                 }
-
-                if(!outputType.equals(inputType)){
-                    logger.info("The output type of the source block is different from the input type of the destination block.");
-                    throw new TypeMismatchException(outputType, inputType);
-                }
-
-
             }
         }
 
+        return blockData;
     }
 
     /**
@@ -236,7 +383,7 @@ public class ContinuousBlock {
                                 List<Object> components = new ArrayList<>();
                                 JSONArray array = values.getJSONArray(key);
                                 ParameterizedType listType = (ParameterizedType) f.getGenericType();
-                                Class<?> listClass = (Class<?>) listType.getActualTypeArguments()[0];
+                                Class<?> listClass = (Class<?>) listType.getActualTypeArguments()[0];///get the type inside the list<>
                                 for(int i = 0; i < array.length(); i++){
                                     if(listClass.equals(File.class)){
                                         components.add(new File(continuousWorkFlow.getRemoteDirectory() + File.separator + array.get(i)));
@@ -340,6 +487,103 @@ public class ContinuousBlock {
 
         return blockJs;
     }
+
+
+
+
+
+    /**
+     *  Externally access main function, modification of parameters will affect reflective access
+     *
+     * @param args 1) serialized input file 2) serialized output file 3) Package Name
+     */
+    public static void main(String[] args) {
+        try {
+            //Reading BlockData object from file
+            BlockData blockData = SerializationUtils.deserialize(FileUtils.readFileToByteArray(new File(args[0])));
+
+            Set<Class<?>> blockTypes = new Reflections(args[2]).getTypesAnnotatedWith(BlockType.class);
+
+            Class type = null;
+
+            for (Class blockType : blockTypes) {
+                Annotation annotation = blockType.getAnnotation(BlockType.class);
+                Class<? extends Annotation>  currentType = annotation.annotationType();
+
+                String blockTypeName = (String) currentType.getDeclaredMethod("type").invoke(annotation, (Object[]) null);
+                if (blockData.getName().equals(blockTypeName)) {
+                    type=blockType;
+                    break;
+                }
+            }
+
+            Object obj;
+            if(type!=null){
+                obj=type.newInstance();
+            }
+            else{
+                logger.error("No classes with Workflow Designer BlockType Annotations were found!");
+                throw new Exception("Error Finding Annotated Class");
+            }
+
+
+            for(Field field:type.getDeclaredFields()){
+                field.setAccessible(true);
+                if(field.getAnnotation(BlockInput.class)!=null){
+                    field.set(obj,blockData.getInput().get(field.getAnnotation(BlockInput.class).name()));
+                }
+                else if(field.getAnnotation(BlockProperty.class)!=null){
+                    field.set(obj,blockData.getProperties().get(field.getAnnotation(BlockProperty.class).name()));
+                }
+            }
+
+
+            Method executeMethod = null;
+
+            for(Method m:type.getDeclaredMethods()){
+                m.setAccessible(true);
+                if(m.getAnnotation(BlockExecute.class)!=null){
+                    executeMethod=m;
+                    break;
+                }
+            }
+
+            if(executeMethod!=null){
+                Object outputObj=executeMethod.invoke(obj);
+                blockData.setProcessOutput(outputObj);
+            }
+            else{
+                logger.error("No method annotated with Workflow Designer BlockExecute was found");
+                throw new Exception("Error finding Execute Method");
+            }
+
+            blockData.setOutput(new HashMap<String, Object>());
+
+            for(Field field:type.getDeclaredFields()){
+                field.setAccessible(true);
+                if(field.getAnnotation(BlockOutput.class)!=null){
+                    blockData.getOutput().put(field.getAnnotation(BlockOutput.class).name(),field.get(obj));
+                }
+
+            }
+
+            //Write output object to file
+            FileOutputStream fos = FileUtils.openOutputStream(new File(args[1]));
+            SerializationUtils.serialize(blockData,fos);
+            fos.close();
+        }
+        catch (Exception e) {
+            //We need to write error to System.err to
+            //propagate exception to the process that started this block.
+            //This block is usually started in @executeAsJar and std error
+            //output is redirected to propagate exception.
+            if(e.getCause() != null)
+                e.getCause().printStackTrace();
+            else
+                e.printStackTrace();
+        }
+    }
+
 
 
     public int getId() {
