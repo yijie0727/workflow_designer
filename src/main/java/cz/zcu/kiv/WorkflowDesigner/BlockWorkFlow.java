@@ -27,7 +27,7 @@ public class BlockWorkFlow {
 
     private Map<Integer,  BlockObservation> indexBlocksMap;
     private boolean[] errorFlag = new boolean[1]; //denote whether the whole workFlow completed successfully or not
-    private List<BlockObservation> startBlocksList;
+    private Set<Integer> startBlocksSet;
     private int[] count = new int[1];
 
     /**
@@ -115,42 +115,37 @@ public class BlockWorkFlow {
         JSONArray blocksArray = jObject.getJSONArray("blocks");
         JSONArray edgesArray  = jObject.getJSONArray("edges");
 
-        count[0] = 0;
+        count[0] = blocksArray.length();
         errorFlag[0] = false;
 
-        //initialize  and  set  map<ContinuousBlockID,  BlockObservation> indexBlocksMap(config I/Os and assign properties)
+        //initialize  and  set  map<ID,  BlockObservation> indexBlocksMap(config I/Os and assign properties)
         mapIndexBlock(blocksArray, outputFolder, workflowOutputFile);
 
-        //initialize IO map
+        //initialize IO map and block start list for thread
         mapBlocksIO(edgesArray);
 
         //add observers to their corresponding observables (add destination blocks to their corresponding source blocks)
         registerObservers();
 
 
-        logger.info("………………………………………………………………………………………………………………………………………  Start the threads for blocks with no @BlockInput:  ……………………………………………………………………………………………………………………………………………………………………………………… ");
-        for(BlockObservation startBlock: startBlocksList){
-            logger.info("Start the execution of Blocks in the startBlocksList - id "+startBlock.getId()+", name "+startBlock.getName());
-            count[0]++;
+        logger.info("………………………………………………………………………………………………  Start the threads for blocks in the start list:  ………………………………………………………………………………………………………………… ");
+        for(int startBlockId : startBlocksSet){
+            //count[0]++;
+            BlockObservation startBlock = indexBlocksMap.get(startBlockId);
+            logger.info("Start the execution of Blocks in the startBlocksSet - id "+startBlock.getId()+", name "+startBlock.getName()+ "in the start list");
             Thread myExecuteThread = new Thread(startBlock);
             myExecuteThread.start();
         }
-        logger.info("………………………………… Submitted all the block threads with no @BlockInput: ……………………………………………………… ");
-
+        logger.info(" ………………… Submitted all the block threads in the start list ………………………");
 
         do{
             Thread.sleep(2000);
-        }while(count[0]!= 0);
-
-        logger.info("…………………………………………………………………………………………………………………………………………………………………………………… All the threads finished ……………………………………………………………………………………………………………………………………………………………………………………………………………………………………… ");
+        }while(count[0]!= 0 && !errorFlag[0]);
 
 
-
-
-        if(!errorFlag[0])
-            logger.info( "Workflow Execution completed successfully!");
-        else
-            logger.error("Workflow Execution failed!");
+        logger.info("……………………………………………………………………………………………………………………………………… All the threads finished …………………………………………………………………………………………………………………………………………………  ");
+        if(!errorFlag[0])  logger.info( "Workflow Execution completed successfully!");
+        else logger.error("Workflow Execution failed!");
 
         return blocksArray;
     }
@@ -207,13 +202,8 @@ public class BlockWorkFlow {
             currBlock.setCount(count);
 
             idBlocksMap.put(id, currBlock);
-            if(currBlock.getInputs() == null || currBlock.getInputs().size() == 0 ){
-                startList.add(currBlock);
-            }
         }
-
         setIndexBlocksMap(idBlocksMap);
-        setStartBlocksList(startList);
     }
 
 
@@ -225,12 +215,13 @@ public class BlockWorkFlow {
     public void mapBlocksIO(JSONArray edgesArray){
         logger.info("Set IOMap for each destination Blocks ");
 
+        startBlocksSet = new HashSet<>(indexBlocksMap.keySet());
+
         for(int i = 0; i<edgesArray.length(); i++){
             JSONObject edge = edgesArray.getJSONObject(i);
 
             int block1ID = edge.getInt("block1");
             BlockObservation block1 = indexBlocksMap.get(block1ID);
-            // BlockObservation block1 = indexBlocksMap.get(block1ID);
             String sourceParam = edge.getJSONArray("connector1").getString(0);
             BlockSourceOutput sourceOutput = new BlockSourceOutput(block1ID, block1, sourceParam);
 
@@ -245,7 +236,7 @@ public class BlockWorkFlow {
             block2.setIOMap(IOMap);
 
 
-            // Set destinationObservers and sourceObservables
+            // Set destinationObservers and sourceObservables for Observer Pattern
             List<BlockObservation> destinationObservers = block1.getDestinationObservers();
             if(!destinationObservers.contains(block2))
                 destinationObservers.add(block2);
@@ -253,10 +244,18 @@ public class BlockWorkFlow {
 
             List<BlockObservation>  sourceObservables   = block2.getSourceObservables();
             if(!sourceObservables.contains(block1))
-                sourceObservables.add(block2);
+                sourceObservables.add(block1);
             block2.setSourceObservables(sourceObservables);
 
+            // Deal with the start lists
+            if(startBlocksSet.contains(block2ID)) startBlocksSet.remove(block2ID);
         }
+
+        for(int id: indexBlocksMap.keySet()){
+            BlockObservation currBlock = indexBlocksMap.get(id);
+            logger.info("current block id"+currBlock.getId()+", name "+currBlock.getName()+", sourceObservables size = "+currBlock.getSourceObservables().size());
+        }
+
     }
 
 
@@ -329,12 +328,12 @@ public class BlockWorkFlow {
         this.jarDirectory = jarDirectory;
     }
 
-    public List<BlockObservation> getStartBlocksList() {
-        return startBlocksList;
+    public Set<Integer> getStartBlocksSet() {
+        return startBlocksSet;
     }
 
-    public void setStartBlocksList(List<BlockObservation> startBlocksList) {
-        this.startBlocksList = startBlocksList;
+    public void setStartBlocksSet(Set<Integer> startBlocksSet) {
+        this.startBlocksSet = startBlocksSet;
     }
 }
 

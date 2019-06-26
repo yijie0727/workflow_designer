@@ -72,14 +72,12 @@ public class BlockObservation extends Observable implements Observer, Runnable {
 
     @Override
     public void run() {
-        logger.info(" —————————————start————run ————————————————————————————————————————————————————————————————count[0] in this thread is "+count[0]+" —— id = "+getId()+", name = "+getName());
+        logger.info(" Start thread run for  —— id = "+getId()+", name = "+getName()+":  count[0] = "+count[0]);
 
         boolean error = false;
         StringBuilder stdErr = new StringBuilder();
         StringBuilder stdOut = new StringBuilder();
         try{
-            logger.info(" ———————————————————————————————————————————————————————————————————————————————————————————————————— Run the thread of id = "+getId()+", name = "+getName());
-
             this.connectIO();
             finalOutputObject = this.blockExecute(stdOut, stdErr);
 
@@ -87,35 +85,30 @@ public class BlockObservation extends Observable implements Observer, Runnable {
             logger.error("Error executing id = "+ getId()+", name = "+ getName()+" Block natively", e);
             error = true;
             synchronized (errorFlag){ errorFlag[0] = true; }
-
         }
 
         try {
-            logger.info("in update ——————————————————— "+getId()+", name = "+getName() );
             updateJSON(error, stdErr.toString(), stdOut.toString());
         }catch (IOException e){
             logger.error("Error update JSON File of id = "+ getId()+", name = "+ getName()+" Block", e);
         }
 
-
         synchronized (count){  count[0]--; }
 
-
-        logger.info(" ——————————————end—————run——————————————————————————————————————————————————————————————count[0] in this thread is "+count[0]+" —— id = "+getId()+", name = "+getName());
+        logger.info(" End thread run for —— id = "+getId()+", name = "+getName()+ ":  count[0] = "+count[0]);
     }
 
 
     //—————————— for observers  (  destination blocks )  ————update—————————
     @Override
     public void update(Observable o, Object arg) {
+        logger.info("Observer Id = "+ getId()+", receives the notification from its Observable "+((BlockObservation) o).id);
         observablesCount ++;
 
         if(observablesCount == sourceObservables.size()){
             if(errorFlag[0]) return;
 
-            synchronized (count){  count[0]++; }
-
-            logger.info(" ——————  ——————  ——————  ——————  ——————  ——————  ——————  ——————  ——————  ——————  —————— Start the thread for block id = "+getId()+", name = "+getName()+" —————— ");
+            logger.info(" —————— Observation update ready for block id = "+getId()+", name = "+getName()+" —————— ");
             Thread myExecuteThread = new Thread(this);
             myExecuteThread.start();
 
@@ -152,15 +145,13 @@ public class BlockObservation extends Observable implements Observer, Runnable {
         setFinalOutputObject(output);
         setComplete(true);
 
-
         // observable tells all its observers that it has finished execute method
         // and after notify all, just delete all its observers
         setChanged();
         notifyObservers();
         this.deleteObservers();
 
-
-        logger.info("Execution block id = "+ getId() +", name = "+getName()+ " block completed successfully");
+        logger.info("Execution block id = "+ getId() +", name = "+getName()+ " block completed successfully, now notify its Observers");
         return output;
     }
 
@@ -169,7 +160,7 @@ public class BlockObservation extends Observable implements Observer, Runnable {
      *  block execute natively(without execute Jar)
      */
     public Object executeInNative() throws IllegalAccessException, InvocationTargetException {
-        logger.info("Natively Executing a block:  id-"+getId()+", name-"+getName());
+        logger.info("Executing id-"+getId()+", name-"+getName()+" in Native.");
 
         Object output = null;
         for(Method method : this.context.getClass().getDeclaredMethods()){
@@ -193,7 +184,7 @@ public class BlockObservation extends Observable implements Observer, Runnable {
      * @throws Exception when output file is not created
      */
     private Object executeAsJar(BlockData blockData, StringBuilder stdOut, StringBuilder stdErr) throws Exception {
-        logger.info("Executing id = "+ getId() +", name = "+getName()+" as a JAR");
+        logger.info("Executing id = "+ getId() +", name = "+getName()+" as a JAR.");
 
         Object output;
         try {
@@ -287,6 +278,7 @@ public class BlockObservation extends Observable implements Observer, Runnable {
 
     //update the JSON file of "blocks"
     public void updateJSON(boolean error, String stdErr, String stdOut) throws IOException {
+        logger.info("Update JSON for blocl "+getId()+", name = "+getName() );
 
         blockObject.put("error", error);
         blockObject.put("stderr", stdErr);
@@ -353,7 +345,7 @@ public class BlockObservation extends Observable implements Observer, Runnable {
 
         synchronized (blocksArray){
             //Save Present JSON (with outputs, errors) to the original file
-            logger.info("update blocksArray JSON in workflowOutputFile for block id = "+ getId() +", name = "+ getName());
+            logger.info("Update blocksArray JSON in workflowOutputFile for block id = "+ getId() +", name = "+ getName());
             if(workflowOutputFile!=null){
                 File workflowOutput = new File(workflowOutputFile);
                 FileUtils.writeStringToFile(workflowOutput, blocksArray.toString(4), Charset.defaultCharset());
@@ -369,8 +361,8 @@ public class BlockObservation extends Observable implements Observer, Runnable {
      * by setting the value of the Input using reflection
      *
      */
-    public BlockData connectIO() throws IllegalAccessException, TypeMismatchException{
-        logger.info(" ______ Connect all the Inputs of BlockObservation[ ID = "+this.id+", " +this.name+" ] with its SourceOutputs.");
+    public BlockData connectIO() throws IllegalAccessException {
+        logger.info(" Connect all the Inputs of BlockObservation[ ID = "+this.id+", " +this.name+" ] with its SourceOutputs.");
         BlockData blockData = new BlockData(getName());//for normal data
 
         if(!stream){
