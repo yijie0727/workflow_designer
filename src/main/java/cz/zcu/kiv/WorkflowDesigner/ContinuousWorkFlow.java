@@ -176,16 +176,6 @@ public class ContinuousWorkFlow {
             // get class from Constructor:  Map<Class, String> moduleSource,
             // when execute, moduleSource map is initialized not module string
             Set<Class> blockClasses = moduleSource.keySet();
-//            Set<Class<?>> blockClasses;
-//            Collection<String> modules = moduleSource.values();
-//            HashSet<String>packages=new HashSet<>();
-//            for(String module: modules){
-//                packages.add(module.split(":")[1]);
-//            }
-//            // Load classes from packages using reflection
-//            blockClasses = new Reflections(packages.toArray(new String[packages.size()]),this.classLoader).getTypesAnnotatedWith(BlockType.class);
-//System.out.println("classLoader = "+classLoader.toString());
-//System.out.println("blockTypes = "+ blockClasses);
 
             for(Class blockClass : blockClasses){
 
