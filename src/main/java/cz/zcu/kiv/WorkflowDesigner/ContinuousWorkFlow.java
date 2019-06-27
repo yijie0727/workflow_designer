@@ -134,7 +134,7 @@ public class ContinuousWorkFlow {
             JSONObject blockObject = blocksArray.getJSONObject(i);
             int blockID = blockObject.getInt("id");
             ContinuousBlock currBlock = indexBlocksMap.get(blockID);
-            ContinuousTask blockExecuteTask = new ContinuousTask(blockID, currBlock, errorFlag, blockObject, outputFolder);
+            ContinuousTask blockExecuteTask = new ContinuousTask(blockID, currBlock, errorFlag, blockObject, outputFolder, workflowOutputFile, blocksArray);
             workFlowThreadPool.submit(blockExecuteTask);
         }
         workFlowThreadPool.shutdown();
@@ -144,12 +144,6 @@ public class ContinuousWorkFlow {
         } while(loop);
         logger.info("……………………………………………………………………………………………………  ShutDown the Thread Pool successfully. Close all the taskThreads of this workFlow. …………………………………………………………………………………………………………………………………………………………… ");
 
-
-        //Save Present JSON (with outputs, errors) to the original file
-        if(workflowOutputFile!=null){
-            File workflowOutput=new File(workflowOutputFile);
-            FileUtils.writeStringToFile(workflowOutput, blocksArray.toString(4), Charset.defaultCharset());
-        }
 
         if(!errorFlag[0])
             logger.info( "Workflow Execution completed successfully!");
@@ -177,11 +171,12 @@ public class ContinuousWorkFlow {
             JSONObject blockObject = blocksArray.getJSONObject(i);
             String blockTypeStr = blockObject.getString("type");
             int id = blockObject.getInt("id");
-            String module = blockObject.getString("module");
+            String moduleStr = blockObject.getString("module");
 
             // get class from Constructor:  Map<Class, String> moduleSource,
             // when execute, moduleSource map is initialized not module string
             Set<Class> blockClasses = moduleSource.keySet();
+
             for(Class blockClass : blockClasses){
 
                 Annotation annotation = blockClass.getAnnotation(BlockType.class);
@@ -191,7 +186,7 @@ public class ContinuousWorkFlow {
                 String blockTypeName = (String)blockType.getDeclaredMethod("type").invoke(annotation);
 
                 if(blockTypeName.equals(blockTypeStr)){
-                    currBlock = createBlockInstance(blockClass, module);
+                    currBlock = createBlockInstance(blockClass, moduleStr);
                     currBlock.setId(id);
                     break;
                 }

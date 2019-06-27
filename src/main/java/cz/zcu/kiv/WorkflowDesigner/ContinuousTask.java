@@ -7,6 +7,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.*;
@@ -31,16 +32,20 @@ public class ContinuousTask implements Callable<Boolean> {
     private StringBuilder stdErr = new StringBuilder();
     private StringBuilder stdOut = new StringBuilder();
     private String outputFolder;
+    private String workflowOutputFile;
+    private final JSONArray blocksArray;
 
     private boolean[] errorFlag; //errorFlag of the whole workFlow
 
 
-    public ContinuousTask(int blockID, ContinuousBlock currBlock, boolean[] errorFlag, JSONObject blockObject, String outputFolder) {
+    public ContinuousTask(int blockID, ContinuousBlock currBlock, boolean[] errorFlag, JSONObject blockObject, String outputFolder, String workflowOutputFile, JSONArray blocksArray) {
         this.blockID = blockID;
         this.currBlock = currBlock;
         this.errorFlag = errorFlag;
         this.blockObject = blockObject;
         this.outputFolder = outputFolder;
+        this.workflowOutputFile = workflowOutputFile;
+        this.blocksArray = blocksArray;
     }
 
 
@@ -56,7 +61,7 @@ public class ContinuousTask implements Callable<Boolean> {
 
             if(currBlock.isStream()){
                 //when input is stream
-                logger.info(" _______________  _______________  ______________block id = "+blockID +", name = "+currBlock.getName()+" deal with stream");
+                logger.info(" ______________block id = "+blockID +", name = "+currBlock.getName()+" deal with stream");
 
                 currBlock.connectIO();
                 while (!checkInputsReady()) {
@@ -68,7 +73,7 @@ public class ContinuousTask implements Callable<Boolean> {
 
             } else {
                 //when input is not stream like primitive data, list, File
-                logger.info(" _______________  _______________  ______________block id = "+blockID +", name = "+currBlock.getName()+" deal with normal data type");
+                logger.info(" ______________block id = "+blockID +", name = "+currBlock.getName()+" deal with normal data type");
 
                 while (!checkSourceComplete()) {
                     if(errorFlag[0]) return false;
@@ -76,44 +81,36 @@ public class ContinuousTask implements Callable<Boolean> {
                     Thread.sleep(1000);
                 }
             }
-
         }
 
         //check errorFlag again, if errorFlag = true, immediately end the thread
         if(errorFlag[0]) return false;
 
+        //execute block
         try{
-            output = currBlock.blockExecute();
-            currBlock.setFinalOutputObject(output);
-            currBlock.setComplete(true);
+            output = currBlock.blockExecute(stdOut, stdErr);
             updateJSON();
+            //currBlock.setComplete(true);
+
 
         } catch (Exception e){
-            e.printStackTrace();
             error = true;
-            stdErr.append(ExceptionUtils.getRootCauseMessage(e)+" \n");
-            for(String trace:ExceptionUtils.getRootCauseStackTrace(e)){
-                stdErr.append(trace+" \n");
-            }
-
             synchronized (errorFlag){ errorFlag[0] = true; }
+
             updateJSON();
-
-            logger.error("Error executing id = "+blockID +", name = "+ currBlock.getName()+" Block natively", e);
-            throw e;
+            logger.error("Error executing id = "+blockID +", name = "+ currBlock.getName()+" Block.", e);
         }
-
-
         return false;
     }
 
 
     //update the JSON file of "blocks"
     public void updateJSON() throws IOException{
+        logger.info("update JSON for block id = "+blockID +", name = "+currBlock.getName());
 
         blockObject.put("error", error);
-        blockObject.put("stderr", stdErr);
-        blockObject.put("stdout", stdOut);
+        blockObject.put("stderr", stdErr.toString());
+        blockObject.put("stdout", stdOut.toString());
         blockObject.put("completed", true);
 
         JSONObject JSONOutput = new JSONObject();
@@ -174,6 +171,19 @@ public class ContinuousTask implements Callable<Boolean> {
 
         if (JSONOutput != null)
             blockObject.put("output", JSONOutput);
+
+
+        synchronized (blocksArray){
+            //Save Present JSON (with outputs, errors) to the original file
+            logger.info("update blocksArray JSON in workflowOutputFile for block id = "+blockID +", name = "+currBlock.getName());
+            if(workflowOutputFile!=null){
+                File workflowOutput = new File(workflowOutputFile);
+                FileUtils.writeStringToFile(workflowOutput, blocksArray.toString(4), Charset.defaultCharset());
+            }
+        }
+
+
+
     }
 
 
@@ -223,7 +233,7 @@ public class ContinuousTask implements Callable<Boolean> {
                     return false;
             }
         }
-        currBlock.connectIO();
+//        currBlock.connectIO();
         return true;
     }
 
