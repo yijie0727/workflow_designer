@@ -11,6 +11,8 @@ import java.io.*;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.*;
 import java.nio.charset.Charset;
+import java.rmi.Naming;
+import java.rmi.registry.LocateRegistry;
 import java.util.*;
 
 import org.apache.commons.logging.Log;
@@ -53,6 +55,13 @@ public class Block {
     private Map<String, Data> input;
     private Map<String, Data> output;
     private Map<String,Property> properties;
+
+
+
+    private int id;
+    private BlockData blockData; //This is the data that holds all the Inputs(from source blocks), Properties,  and the Future outPuts for this dest Block
+
+
 
     //Actual Object instance maintained as context
     private Object context;
@@ -267,16 +276,37 @@ public class Block {
      */
     public Object processBlock(Map<Integer,Block> blocks, Map<String,InputField> fields, StringBuilder stdOut, StringBuilder stdErr) throws Exception {
         Object output;
-        BlockData blockData=new BlockData(getName());
+
+        blockData=new BlockData(getName());
 
         logger.info("Processing a "+getName()+" block");
 
-        //Assign inputs to the instance
-        assignInputs(blocks,fields,blockData);
+        //Assign inputs and properties to the BlockData and instance
+        assignInputs(blocks, fields);
+
+
 
         if(isJarExecutable() && workflow.getJarDirectory()!=null){
             //Execute block as an external JAR file
-            output = executeAsJar(blockData,stdOut,stdErr);
+
+
+            //TODO set this BlockDAta to the server remote Implementation class
+            //TODO register communication port and path
+            IRemoteData remoteDataImpleServer = new RemoteDataImple();
+            remoteDataImpleServer.setBlockData(blockData);
+
+            int port = 8800 + getId();
+            LocateRegistry.createRegistry(port);//在服务器的指定端口上启动创建RMI注册表。
+
+            String url = "rmi://localhost:" + port + "/IRemoteData";
+            Naming.rebind(url, remoteDataImpleServer); //将指定的远程对象绑定到注册表中
+            System.out.println("Server registers in port "+ port+",  block "+getId()+", "+getName());
+
+
+
+            output = executeAsJar(stdOut,stdErr, port);
+
+
         }
         else{
             logger.info("Executing "+getName()+" block natively");
@@ -303,26 +333,26 @@ public class Block {
     /**
      * Execute block externally as a JAR
      *
-     * @param blockData Serializable BlockData model representing all the data needed by a block to execute
+     * //@param blockData Serializable BlockData model representing all the data needed by a block to execute
      * @param stdOut Standard Output Stream
      * @param stdErr Standard Error Stream
      * @return output returned by BlockExecute Method
      * @throws Exception when output file is not created
      */
-    private Object executeAsJar(BlockData blockData, StringBuilder stdOut, StringBuilder stdErr) throws Exception {
+    private Object executeAsJar( StringBuilder stdOut, StringBuilder stdErr, int port) throws Exception {
 
         Object output;
         logger.info("Executing "+getName()+" as a JAR");
         try {
             String fileName = "obj_" + new Date().getTime() ;
-            File inputFile=new File(workflow.getJarDirectory()+File.separator+fileName+".in");
+            //File inputFile=new File(workflow.getJarDirectory()+File.separator+fileName+".in");
             File outputFile =new File(workflow.getJarDirectory()+File.separator+fileName+".out");
 
             //Serialize and write BlockData object to a file
-            FileOutputStream fos = new FileOutputStream(inputFile);
-            ObjectOutputStream oos = new ObjectOutputStream(fos);
-            oos.writeObject(blockData);
-            oos.close();
+            //FileOutputStream fos = new FileOutputStream(inputFile);
+            //ObjectOutputStream oos = new ObjectOutputStream(fos);
+            //oos.writeObject(blockData);
+            //oos.close();
 
             File jarDirectory = new File(workflow.getJarDirectory());
             jarDirectory.mkdirs();
@@ -333,7 +363,10 @@ public class Block {
             String defaultVmArgs = "-Xmx1G";
             String vmargs = System.getProperty("workflow.designer.vm.args");
             vmargs = vmargs != null ? vmargs : defaultVmArgs;
-            String[]args=new String[]{"java", vmargs, "-cp",jarFile.getAbsolutePath() ,"cz.zcu.kiv.WorkflowDesigner.Block",inputFile.getAbsolutePath(),outputFile.getAbsolutePath(),getModule().split(":")[1]};
+            //String[]args=new String[]{"java", vmargs, "-cp",jarFile.getAbsolutePath() ,"cz.zcu.kiv.WorkflowDesigner.Block",inputFile.getAbsolutePath(),outputFile.getAbsolutePath(),getModule().split(":")[1]};
+            String blockIdName = String.valueOf(getId()) ;
+            String[]args=new String[]{"java", vmargs, "-cp",jarFile.getAbsolutePath() ,"cz.zcu.kiv.WorkflowDesigner.Block", blockIdName,  outputFile.getAbsolutePath(),   getModule().split(":")[1],   String.valueOf(port)};
+
             logger.info("Passing arguments" + Arrays.toString(args));
             ProcessBuilder pb = new ProcessBuilder(args);
             //Store output and error streams to files
@@ -365,7 +398,7 @@ public class Block {
                 stdOut.append(outputString);
             }
 
-            FileUtils.deleteQuietly(inputFile);
+            //FileUtils.deleteQuietly(inputFile);
 
             if(outputFile.exists()){
                 FileInputStream fis = new FileInputStream(outputFile);
@@ -403,12 +436,12 @@ public class Block {
      * Assign Inputs - Maps output fields of previous block to input fields of next block and initializes properties
      * @param blocks
      * @param fields
-     * @param blockData
+     * //@param blockData
      * @throws FieldMismatchException
      * @throws IllegalAccessException
      * @throws ClassNotFoundException
      */
-    private void assignInputs(Map<Integer,Block> blocks, Map<String,InputField> fields, BlockData blockData) throws FieldMismatchException, IllegalAccessException, ClassNotFoundException {
+    private void assignInputs(Map<Integer,Block> blocks, Map<String,InputField> fields) throws FieldMismatchException, IllegalAccessException, ClassNotFoundException {
         //Assign properties to object instance
         for (Field f: context.getClass().getDeclaredFields()) {
             f.setAccessible(true);
@@ -521,78 +554,6 @@ public class Block {
         return output;
     }
 
-    public Map<String, Property> getProperties() {
-        return properties;
-    }
-
-    public void setProperties(Map<String, Property> properties) {
-        this.properties = properties;
-    }
-
-    public Map<String, Data> getInput() {
-        return input;
-    }
-
-    public void setInput(Map<String, Data> input) {
-        this.input = input;
-    }
-
-    public Map<String, Data> getOutput() {
-        return output;
-    }
-
-    public void setOutput(Map<String, Data> output) {
-        this.output = output;
-    }
-
-    public boolean isProcessed() {
-        return processed;
-    }
-
-    public void setProcessed(boolean processed) {
-        this.processed = processed;
-    }
-
-    /**
-     * Initialize a Block from a class
-     */
-    public void initialize(){
-        if(getProperties()==null)
-            setProperties(new HashMap<String,Property>());
-        if(getInput()==null)
-            setInput(new HashMap<String, Data>());
-        if(getOutput()==null)
-            setOutput(new HashMap<String, Data>());
-
-        for (Field f: context.getClass().getDeclaredFields()) {
-            f.setAccessible(true);
-
-            BlockProperty blockProperty = f.getAnnotation(BlockProperty.class);
-            if (blockProperty != null){
-                properties.put(blockProperty.name(),new Property(blockProperty.name(),blockProperty.type(),blockProperty.defaultValue(), blockProperty.description()));
-            }
-
-            BlockInput blockInput = f.getAnnotation(BlockInput.class);
-            if (blockInput != null){
-                String cardinality="";
-                if(blockInput.type().endsWith("[]")){
-                    cardinality=WorkflowCardinality.MANY_TO_MANY;
-                }
-                else{
-                    cardinality=WorkflowCardinality.ONE_TO_ONE;
-                }
-                input.put(blockInput.name(),new Data(blockInput.name(),blockInput.type(),cardinality));
-            }
-
-            BlockOutput blockOutput = f.getAnnotation(BlockOutput.class);
-            if (blockOutput != null){
-                output.put(blockOutput.name(),new Data(blockOutput.name(),blockOutput.type(),WorkflowCardinality.MANY_TO_MANY));
-            }
-        }
-        logger.info("Initialized "+getName()+" block from annotations");
-
-    }
-
     /**
      *  Externally access main function, modification of parameters will affect reflective access
      *
@@ -601,7 +562,20 @@ public class Block {
     public static void main(String[] args) {
         try {
             //Reading BlockData object from file
-            BlockData blockData = SerializationUtils.deserialize(FileUtils.readFileToByteArray(new File(args[0])));
+           // BlockData blockData = SerializationUtils.deserialize(FileUtils.readFileToByteArray(new File(args[0])));
+
+
+            //TODO set RMI 路径
+            int port = Integer.parseInt(args[3]);
+            String url = "rmi://localhost:" + port + "/IRemoteData";
+            IRemoteData iRemoteDataClient = (IRemoteData) Naming.lookup(url);
+            BlockData blockData = iRemoteDataClient.getBlockData(args[0]);
+            System.out.println("Client get remote blockData for block "+args[0]);
+
+
+
+
+
 
             Set<Class<?>> blockTypes = new Reflections(args[2]).getTypesAnnotatedWith(BlockType.class);
 
@@ -691,5 +665,87 @@ public class Block {
 
     public void setJarExecutable(boolean jarExecutable) {
         this.jarExecutable = jarExecutable;
+    }
+
+
+    public Map<String, Property> getProperties() {
+        return properties;
+    }
+
+    public void setProperties(Map<String, Property> properties) {
+        this.properties = properties;
+    }
+
+    public Map<String, Data> getInput() {
+        return input;
+    }
+
+    public void setInput(Map<String, Data> input) {
+        this.input = input;
+    }
+
+    public Map<String, Data> getOutput() {
+        return output;
+    }
+
+    public void setOutput(Map<String, Data> output) {
+        this.output = output;
+    }
+
+    public boolean isProcessed() {
+        return processed;
+    }
+
+    public void setProcessed(boolean processed) {
+        this.processed = processed;
+    }
+
+    /**
+     * Initialize a Block from a class
+     */
+    public void initialize(){
+        if(getProperties()==null)
+            setProperties(new HashMap<String,Property>());
+        if(getInput()==null)
+            setInput(new HashMap<String, Data>());
+        if(getOutput()==null)
+            setOutput(new HashMap<String, Data>());
+
+        for (Field f: context.getClass().getDeclaredFields()) {
+            f.setAccessible(true);
+
+            BlockProperty blockProperty = f.getAnnotation(BlockProperty.class);
+            if (blockProperty != null){
+                properties.put(blockProperty.name(),new Property(blockProperty.name(),blockProperty.type(),blockProperty.defaultValue(), blockProperty.description()));
+            }
+
+            BlockInput blockInput = f.getAnnotation(BlockInput.class);
+            if (blockInput != null){
+                String cardinality="";
+                if(blockInput.type().endsWith("[]")){
+                    cardinality=WorkflowCardinality.MANY_TO_MANY;
+                }
+                else{
+                    cardinality=WorkflowCardinality.ONE_TO_ONE;
+                }
+                input.put(blockInput.name(),new Data(blockInput.name(),blockInput.type(),cardinality));
+            }
+
+            BlockOutput blockOutput = f.getAnnotation(BlockOutput.class);
+            if (blockOutput != null){
+                output.put(blockOutput.name(),new Data(blockOutput.name(),blockOutput.type(),WorkflowCardinality.MANY_TO_MANY));
+            }
+        }
+        logger.info("Initialized "+getName()+" block from annotations");
+
+    }
+
+
+    public int getId() {
+        return id;
+    }
+
+    public void setId(int id) {
+        this.id = id;
     }
 }

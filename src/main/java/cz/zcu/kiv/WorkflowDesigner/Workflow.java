@@ -214,6 +214,7 @@ public class Workflow {
 
             //Initialize the block I/O and configurations
             block.initialize();
+            block.setId(blockObject.getInt("id"));
 
             //Set reference ID of block
             blocks.put(blockObject.getInt("id"),block);
