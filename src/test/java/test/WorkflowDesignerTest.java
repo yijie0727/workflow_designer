@@ -1,7 +1,6 @@
 package test;
-import cz.zcu.kiv.WorkflowDesigner.ContinuousWorkFlow;
+import cz.zcu.kiv.WorkflowDesigner.BlockWorkFlow;
 import cz.zcu.kiv.WorkflowDesigner.FieldMismatchException;
-import cz.zcu.kiv.WorkflowDesigner.Workflow;
 import org.apache.commons.io.FileUtils;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -37,6 +36,7 @@ import java.util.Map;
  ***********************************************************************************************************************
  *
  * WorkflowDesignerTest, 2018/17/05 6:32 Joey Pinto
+ * WorkflowDesignerTest, 2019 GSoC19 P1  Yijie Huang
  *
  * This test verifies the creation of all available blocks in the designer
  * The test.jar used for testing is the packaged version of the current project with its dependencies.
@@ -45,51 +45,39 @@ public class WorkflowDesignerTest {
 
     @Test
     public void testBlock() throws NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException {
-        JSONArray blocksArray=new Workflow(ClassLoader.getSystemClassLoader(),":test",null,"").initializeBlocks();
+        JSONArray blocksArray=new BlockWorkFlow(ClassLoader.getSystemClassLoader(),":test",null,"").initializeBlocks();
         assert blocksArray.length()==6;
     }
 
     @Test
-    public void testJSONArithmetic() throws IOException, NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException, FieldMismatchException {
+    public void testJSONArithmeticObservation() throws IOException, NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException, FieldMismatchException, InterruptedException {
 
         String json = FileUtils.readFileToString(new File("test_data/test.json"),Charset.defaultCharset());
         JSONObject jsonObject = new JSONObject(json);
-        File outputFile = File.createTempFile("testJSONArithmetic",".json");
+        File outputFile = File.createTempFile("JSONArithmetic_Test_",".json");
         outputFile.deleteOnExit();
-        JSONArray jsonArray = new Workflow(ClassLoader.getSystemClassLoader(), ":test",null,"").execute(jsonObject,"test_data",outputFile.getAbsolutePath());
+
+
+        Map<Class, String> moduleSource = new HashMap<>();
+        ArithmeticBlock A = new ArithmeticBlock();
+        ConstantBlock B = new ConstantBlock();
+        Class classA = A.getClass();
+        Class classB = B.getClass();
+        moduleSource.put(classA, ":test");
+        moduleSource.put(classB, ":test");
+
+
+
+        JSONArray jsonArray = new BlockWorkFlow(ClassLoader.getSystemClassLoader(), moduleSource,null,"test_data").execute(jsonObject,"test_data",outputFile.getAbsolutePath());
 
         assert jsonArray !=null;
         assert jsonArray.getJSONObject(0).getJSONObject("output").getInt("value")==15;
         assert jsonArray.length() == 3;
     }
 
-    @Test
-    public void testJSONSummation() throws IOException, NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException, FieldMismatchException {
-
-        String json = "{\"edges\":[{\"id\":1,\"block1\":3,\"connector1\":[\"Operand\",\"output\"],\"block2\":2,\"connector2\":[\"Operand1\",\"input\",0]},{\"id\":2,\"block1\":1,\"connector1\":[\"Operand\",\"output\"],\"block2\":2,\"connector2\":[\"Operand1\",\"input\",0]}],\"blocks\":[{\"id\":1,\"x\":-277,\"y\":-223,\"type\":\"CONSTANT\",\"module\":\"workflow_test-1.0-jar-with-dependencies.jar:data\",\"values\":{\"Value\":\"3\"}},{\"id\":2,\"x\":119,\"y\":-180,\"type\":\"SUMMATION\",\"module\":\"workflow_test-1.0-jar-with-dependencies.jar:data\",\"values\":{}},{\"id\":3,\"x\":-202,\"y\":-116,\"type\":\"CONSTANT\",\"module\":\"workflow_test-1.0-jar-with-dependencies.jar:data\",\"values\":{\"Value\":\"5\"}}]}";
-        JSONObject jsonObject = new JSONObject(json);
-        File outputFile = File.createTempFile("testJSONSummation",".json");
-        outputFile.deleteOnExit();
-        JSONArray jsonArray = new Workflow(ClassLoader.getSystemClassLoader(), ":test",null,"").execute(jsonObject,"test_data",outputFile.getAbsolutePath());
-        assert jsonArray !=null;
-        assert jsonArray.length() == 3;
-        assert jsonArray.getJSONObject(1).getJSONObject("output").getInt("value")==8;
-    }
 
     @Test
-    public void testConcatenate() throws IOException, NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException, FieldMismatchException {
-        String json="{\"edges\":[],\"blocks\":[{\"id\":1,\"x\":-192,\"y\":-116,\"type\":\"CONCATENATE\",\"module\":\"commons-1.0-jar-with-dependencies.jar:cz.zcu.kiv.commons\",\"values\":{\"Strings\":[\"A\",\"B\"]}}]}";
-        JSONObject jsonObject = new JSONObject(json);
-        File outputFile = File.createTempFile("testConcatenate",".json");
-        outputFile.deleteOnExit();
-        JSONArray jsonArray = new Workflow(ClassLoader.getSystemClassLoader(), ":test",null,"").execute(jsonObject,"test_data",outputFile.getAbsolutePath());
-        assert jsonArray !=null;
-        assert jsonArray.length() == 1;
-        assert jsonArray.getJSONObject(0).getJSONObject("output").getString("value").equals("AB");
-    }
-
-    @Test
-    public void testFileToStreamToFile() throws IOException, NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException, FieldMismatchException, InterruptedException{
+    public void testFileToStreamToFileObservation() throws IOException, NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException, FieldMismatchException, InterruptedException{
         String json = FileUtils.readFileToString(new File("test_data/FileToStreamTest.json"), Charset.defaultCharset());
 
         JSONObject jsonObject = new JSONObject(json);
@@ -104,13 +92,10 @@ public class WorkflowDesignerTest {
         moduleSource.put(classA, ":test");
         moduleSource.put(classB, ":test");
 
-        JSONArray jsonArray = new ContinuousWorkFlow(ClassLoader.getSystemClassLoader(), moduleSource, null,"test_data").execute(jsonObject,"test_data",outputFile.getAbsolutePath());
+        JSONArray jsonArray = new BlockWorkFlow(ClassLoader.getSystemClassLoader(), moduleSource, null,"test_data").execute(jsonObject,"test_data",outputFile.getAbsolutePath());
         assert jsonArray !=null;
         assert jsonArray.length() == 2;
     }
-
-
-
 
 
 }
