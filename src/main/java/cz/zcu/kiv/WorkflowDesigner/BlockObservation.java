@@ -23,6 +23,35 @@ import java.util.*;
 
 import static cz.zcu.kiv.WorkflowDesigner.Type.STREAM;
 
+/***********************************************************************************************************************
+ *
+ * This file is part of the Workflow Designer project
+
+ * ==========================================
+ *
+ * Copyright (C) 2019 by University of West Bohemia (http://www.zcu.cz/en/)
+ *
+ ***********************************************************************************************************************
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
+ *
+ ***********************************************************************************************************************
+ *
+ * Block, 2018/16/05 13:32 Joey Pinto
+ * BlockObservation, 2019 GSoC P1 Yijie Huang
+ *
+ * In 2018, This file is the model for a single block in the workflow designer tool.
+ * In 2019, it implements Observer Pattern design, making destination block execute
+ * once they observer all its source blocks execute successfully.
+ **********************************************************************************************************************/
+
 public class BlockObservation extends Observable implements Observer, Runnable {
 
     private static Log logger = LogFactory.getLog(BlockObservation.class);
@@ -69,7 +98,10 @@ public class BlockObservation extends Observable implements Observer, Runnable {
         this.workflowOutputFile = workflowOutputFile;
     }
 
-
+    /**
+     * run - Yijie Huang
+     * Blocks connect IO and execute in thread
+     */
     @Override
     public void run() {
         logger.info(" Start thread run for  —— id = "+getId()+", name = "+getName()+":  count[0] = "+count[0]);
@@ -99,10 +131,20 @@ public class BlockObservation extends Observable implements Observer, Runnable {
     }
 
 
-    //—————————— for observers  (  destination blocks )  ————update—————————
+
+    /**
+     * update - Yijie Huang
+     *
+     * Destination blocks(Observers) will update the observablesCount,
+     * once they receive notification from their source blocks(Observables).
+     *
+     * And when the observablesCount is equal to the number of their sourceBlocks,
+     * destination blocks start their thread to execute.
+     */
     @Override
     public void update(Observable o, Object arg) {
         logger.info("Observer Id = "+ getId()+", receives the notification from its Observable "+((BlockObservation) o).id);
+        //—————————— for observers  (  destination blocks )  ————update—————————
         observablesCount ++;
 
         if(observablesCount == sourceObservables.size()){
@@ -115,6 +157,18 @@ public class BlockObservation extends Observable implements Observer, Runnable {
         }
     }
 
+    /**
+     * blockExecute - Joey Pinto, Yijie Huang
+     *
+     * Execute a block and return value returned by @BlockExecute block,
+     * Once finish executing(no matter successfully or failed),
+     * it(Observable) will notify all its destination blocks(observers).
+     *
+     * @param stdOut Standard Output stream builder
+     * @param stdErr Error Stream builder
+     * @return Object returned by @BlockExecute method
+     * @throws Exception
+     */
     public Object blockExecute(StringBuilder stdOut, StringBuilder stdErr) throws Exception {
         logger.info("Executing block id = "+ getId() +", name = "+getName());
 
@@ -145,6 +199,7 @@ public class BlockObservation extends Observable implements Observer, Runnable {
         setFinalOutputObject(output);
         setComplete(true);
 
+        //—————————— for observables  (  source blocks )  ———— notify —————————
         // observable tells all its observers that it has finished execute method
         // and after notify all, just delete all its observers
         setChanged();
@@ -157,7 +212,8 @@ public class BlockObservation extends Observable implements Observer, Runnable {
 
 
     /**
-     *  block execute natively(without execute Jar)
+     * executeInNative() - Joey Pinto
+     * block execute natively(without execute Jar)
      */
     public Object executeInNative() throws IllegalAccessException, InvocationTargetException {
         logger.info("Executing id-"+getId()+", name-"+getName()+" in Native.");
@@ -175,7 +231,7 @@ public class BlockObservation extends Observable implements Observer, Runnable {
     }
 
     /**
-     * Execute block externally as a JAR
+     * Execute block externally as a JAR - Joey Pinto
      *
      * @param blockData Serializable BlockData model representing all the data needed by a block to execute
      * @param stdOut Standard Output Stream
@@ -276,7 +332,10 @@ public class BlockObservation extends Observable implements Observer, Runnable {
 
 
 
-    //update the JSON file of "blocks"
+    /**
+     * updateJSON - Joey Pinto
+     * update the JSON file of "blocks"
+     */
     public void updateJSON(boolean error, String stdErr, String stdOut) throws IOException {
         logger.info("Update JSON for blocl "+getId()+", name = "+getName() );
 
@@ -357,6 +416,7 @@ public class BlockObservation extends Observable implements Observer, Runnable {
 
 
     /**
+     * connectIO() - Joey Pinto, Yijie Huang
      * connect the Input of this Block with all its SourceOutput of sourceBlocks
      * by setting the value of the Input using reflection
      *
@@ -446,7 +506,8 @@ public class BlockObservation extends Observable implements Observer, Runnable {
 
 
     /**
-     * exactly same functionality as initialize method by Joey Pinto
+     * initializeIO() - Joey Pinto
+     * Initialize a Block from a class
      */
     public void initializeIO(){
 
@@ -503,8 +564,8 @@ public class BlockObservation extends Observable implements Observer, Runnable {
 
 
     /**
+     * assignProperties - Yijie Huang
      * reflection to set the block context instance 's properties field
-     *
      */
     public void assignProperties(JSONObject blockObject) throws IllegalAccessException{
 
@@ -561,7 +622,7 @@ public class BlockObservation extends Observable implements Observer, Runnable {
 
 
     /**
-     *
+     * getFieldFromJSON - Joey Pinto
      * @param f - Relfection field
      * @param values - JSON object containing values assigned to properties
      * @param key - Key to get Field
@@ -592,6 +653,7 @@ public class BlockObservation extends Observable implements Observer, Runnable {
 
 
     /**
+     * toJSON() - Joey Pinto
      * Convert Block to JSON for front-end by Joey Pinto
      */
     public JSONObject toJSON(){
@@ -644,8 +706,8 @@ public class BlockObservation extends Observable implements Observer, Runnable {
 
 
     /**
-     *  Externally access main function, modification of parameters will affect reflective access
-     *
+     * main - Joey Pinto
+     * Externally access main function, modification of parameters will affect reflective access
      * @param args 1) serialized input file 2) serialized output file 3) Package Name
      */
     public static void main(String[] args) {

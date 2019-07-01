@@ -11,7 +11,34 @@ import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationTargetException;
 import java.util.*;
-import java.util.concurrent.LinkedBlockingQueue;
+
+/***********************************************************************************************************************
+ *
+ * This file is part of the Workflow Designer project
+
+ * ==========================================
+ *
+ * Copyright (C) 2019 by University of West Bohemia (http://www.zcu.cz/en/)
+ *
+ ***********************************************************************************************************************
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
+ *
+ ***********************************************************************************************************************
+ *
+ * Workflow, 2018/17/05 6:32 Joey Pinto
+ * BlockWorkFlow, 2019 GSoC P1 Yijie Huang
+ *
+ * This file hosts the methods used to dynamically create the Javascript files needed for the workflow designer
+ * Front end sends JSON to it to initialize block tree and execute workFlow.
+ **********************************************************************************************************************/
 
 public class BlockWorkFlow {
 
@@ -52,9 +79,9 @@ public class BlockWorkFlow {
 
 
     /**
-     * initializeBlocks
+     * initializeBlocks - Joey Pinto
      * prepare JSON for the Front end to form the blocks tree
-     *
+     * This method initializes a directory made up of javascript files with all annotated blocktypes
      */
     public JSONArray initializeBlocks() throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
         initializeBlockDefinitions();
@@ -67,6 +94,11 @@ public class BlockWorkFlow {
         return blocksArray;
     }
 
+    /**
+     * initializeBlockDefinitions() - Joey Pinto, Yijie Huang
+     * This method creates a singleton access to block definitions,
+     * it initializes List<BlockObservation> blockDefinitions for front end to form blocks tree
+     */
     public void initializeBlockDefinitions() throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
         if(blockDefinitions !=null) return;
 
@@ -82,7 +114,11 @@ public class BlockWorkFlow {
         setBlockDefinitions(blocksList);
     }
 
-    private  BlockObservation createBlockInstance(Class blockClass, String moduleStr, JSONArray blocksArray, String workflowOutputFile) throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
+    /**
+     * createBlockInstance - Joey Pinto, Yijie Huang
+     * This method initializes a block according to the given info
+     */
+    private BlockObservation createBlockInstance(Class blockClass, String moduleStr, JSONArray blocksArray, String workflowOutputFile) throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
         BlockObservation currBlock = new  BlockObservation(blockClass.newInstance(), this, blocksArray, workflowOutputFile );
 
         Annotation annotation = blockClass.getAnnotation(BlockType.class);
@@ -103,7 +139,9 @@ public class BlockWorkFlow {
     }
 
     /**
-     * execute
+     * execute - Yijie Huang, Joey Pinto
+     *
+     * This method receives front end workflow's JSON file and to execute the workFlow.
      * @param jObject               SONObject contains Blocks and Edges info
      * @param outputFolder          Folder to save the output File
      * @param workflowOutputFile    File workflowOutputFile = File.createTempFile("job_"+getId(),".json",new File(WORKING_DIRECTORY));
@@ -153,16 +191,14 @@ public class BlockWorkFlow {
 
 
     /**
-     * mapBlockIndex
-     * the same functionality of the method: indexBlocks - Joey Pinto 2018
+     * mapBlockIndex - Yijie Huang, Joey Pinto
      *
-     * map all the ContinuousBlocks related in this workflow according to the front-end blocks JSONArray
+     * map all the BlockObservations related in this workflow according to the front-end blocks JSONArray
      * initialize Map<Integer,  BlockObservation> indexMap, and initialize all the properties
      */
     public void mapIndexBlock(JSONArray blocksArray, String outputFolder, String workflowOutputFile) throws NoSuchMethodException, IllegalAccessException, InvocationTargetException, InstantiationException, FieldMismatchException {
         logger.info("initialize all the related ContinuousBlocks(including I/O/properties initialization) in this workFlow and set the idBlocksMap");
         Map<Integer, BlockObservation> idBlocksMap = new HashMap<>();
-        List<BlockObservation> startList = new ArrayList<>();
 
         for(int i = 0; i<blocksArray.length(); i++){
             BlockObservation currBlock = null;
@@ -208,9 +244,10 @@ public class BlockWorkFlow {
 
 
     /**
-     * mapBlocksIO
-     * set Map<String, List< BlockSourceOutput></BlockSourceOutput>> IOMap for each Blocks according to the JSONArray edgeArray;
-     *
+     * mapBlocksIO - Yijie Huang
+     * set Map<String, List< BlockSourceOutput>> IOMap for each Blocks according to the JSONArray edgeArray;
+     * assign destinationObservers and sourceObservables for each block for Observer Pattern design;
+     * initialize the startBlocksSet(): BlockObservations with no source blocks
      */
     public void mapBlocksIO(JSONArray edgesArray){
         logger.info("Set IOMap for each destination Blocks ");
@@ -258,7 +295,10 @@ public class BlockWorkFlow {
 
     }
 
-
+    /**
+     * registerObservers() - Yijie Huang
+     * add all the corresponding observers(dest BlockObservations) to the observables(source BlockObservations)
+     */
     public void registerObservers(){
         for(int blockID : indexBlocksMap.keySet()){
             BlockObservation sourceBlock = indexBlocksMap.get(blockID);
