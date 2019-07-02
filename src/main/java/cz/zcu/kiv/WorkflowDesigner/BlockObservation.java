@@ -90,6 +90,18 @@ public class BlockObservation extends Observable implements Observer, Runnable {
 
 
 
+    //var for workFlow jobID: same workflow same jobID
+    private long jobID;
+
+    public long getJobID() {
+        return jobID;
+    }
+
+    public void setJobID(long jobID) {
+        this.jobID = jobID;
+    }
+
+
 
     public BlockObservation(Object context, BlockWorkFlow blockWorkFlow, JSONArray blocksArray, String workflowOutputFile) {
         this.context = context;
@@ -104,7 +116,7 @@ public class BlockObservation extends Observable implements Observer, Runnable {
      */
     @Override
     public void run() {
-        logger.info(" Start thread run for  —— id = "+getId()+", name = "+getName()+":  count[0] = "+count[0]);
+        logger.info(" Start thread run for  —— id = "+getId()+", name = "+getName()+":  count[0] = "+count[0]+", in jobID "+jobID);
 
         boolean error = false;
         StringBuilder stdErr = new StringBuilder();
@@ -114,7 +126,7 @@ public class BlockObservation extends Observable implements Observer, Runnable {
             finalOutputObject = this.blockExecute(stdOut, stdErr);
 
         } catch (Exception e){
-            logger.error("Error executing id = "+ getId()+", name = "+ getName()+" Block natively", e);
+            logger.error("Error executing id = "+ getId()+", name = "+ getName()+" Block"+", in jobID "+jobID, e);
             error = true;
             synchronized (errorFlag){ errorFlag[0] = true; }
         }
@@ -122,12 +134,12 @@ public class BlockObservation extends Observable implements Observer, Runnable {
         try {
             updateJSON(error, stdErr.toString(), stdOut.toString());
         }catch (IOException e){
-            logger.error("Error update JSON File of id = "+ getId()+", name = "+ getName()+" Block", e);
+            logger.error("Error update JSON File of id = "+ getId()+", name = "+ getName()+" Block"+", in jobID "+jobID, e);
         }
 
         synchronized (count){  count[0]--; }
 
-        logger.info(" End thread run for —— id = "+getId()+", name = "+getName()+ ":  count[0] = "+count[0]);
+
     }
 
 
@@ -143,14 +155,14 @@ public class BlockObservation extends Observable implements Observer, Runnable {
      */
     @Override
     public void update(Observable o, Object arg) {
-        logger.info("Observer Id = "+ getId()+", receives the notification from its Observable "+((BlockObservation) o).id);
+        logger.info("Observer Id = "+ getId()+", receives the notification from its Observable "+((BlockObservation) o).id+", in jobID "+jobID);
         //—————————— for observers  (  destination blocks )  ————update—————————
         observablesCount ++;
 
         if(observablesCount == sourceObservables.size()){
             if(errorFlag[0]) return;
 
-            logger.info(" —————— Observation update ready for block id = "+getId()+", name = "+getName()+" —————— ");
+            logger.info(" —————— Observation update ready for block id = "+getId()+", name = "+getName()+" —————— "+", in jobID "+jobID);
             Thread myExecuteThread = new Thread(this);
             myExecuteThread.start();
 
@@ -170,7 +182,7 @@ public class BlockObservation extends Observable implements Observer, Runnable {
      * @throws Exception
      */
     public Object blockExecute(StringBuilder stdOut, StringBuilder stdErr) throws Exception {
-        logger.info("Executing block id = "+ getId() +", name = "+getName());
+        logger.info("Executing block id = "+ getId() +", name = "+getName()+", in jobID "+jobID);
 
         Object output;
 
@@ -191,7 +203,7 @@ public class BlockObservation extends Observable implements Observer, Runnable {
                 for(String trace:ExceptionUtils.getRootCauseStackTrace(e)){
                     stdErr.append(trace+" \n");
                 }
-                logger.error("Error executing "+getName()+" Block natively",e);
+                logger.error("Error executing id"+id+" "+name+" Block natively"+", in jobID "+jobID,e);
                 throw e;
             }
         }
@@ -206,7 +218,7 @@ public class BlockObservation extends Observable implements Observer, Runnable {
         notifyObservers();
         this.deleteObservers();
 
-        logger.info("Execution block id = "+ getId() +", name = "+getName()+ " block completed successfully, now notify its Observers");
+        logger.info("Execution block id = "+ getId() +", name = "+getName()+ " block completed successfully, now notify its Observers"+", in jobID "+jobID);
         return output;
     }
 
@@ -216,7 +228,7 @@ public class BlockObservation extends Observable implements Observer, Runnable {
      * block execute natively(without execute Jar)
      */
     public Object executeInNative() throws IllegalAccessException, InvocationTargetException {
-        logger.info("Executing id-"+getId()+", name-"+getName()+" in Native.");
+        logger.info("Executing id-"+getId()+", name-"+getName()+" in Native."+", in jobID "+jobID);
 
         Object output = null;
         for(Method method : this.context.getClass().getDeclaredMethods()){
@@ -226,7 +238,7 @@ public class BlockObservation extends Observable implements Observer, Runnable {
                 break;
             }
         }
-        logger.info("Finish natively execute the block:  id-"+getId()+", name-"+getName());
+
         return output;
     }
 
@@ -240,13 +252,15 @@ public class BlockObservation extends Observable implements Observer, Runnable {
      * @throws Exception when output file is not created
      */
     private Object executeAsJar(BlockData blockData, StringBuilder stdOut, StringBuilder stdErr) throws Exception {
-        logger.info("Executing id = "+ getId() +", name = "+getName()+" as a JAR.");
+        logger.info("Executing id = "+ getId() +", name = "+getName()+" as a JAR."+", in jobID "+jobID);
 
         Object output;
         try {
-            String fileName = "obj_" + new Date().getTime() ;
-            File inputFile=new File(blockWorkFlow.getJarDirectory()+File.separator+fileName+".in");
-            File outputFile =new File(blockWorkFlow.getJarDirectory()+File.separator+fileName+".out");
+            String fileName = "jobID_"+jobID+ "_bID_"+id+"_"+new Date().getTime()+"_" ;
+            File inputFileTmp  = File.createTempFile(fileName, ".in",  new File(blockWorkFlow.getJarDirectory()));
+            File outputFileTmp = File.createTempFile(fileName, ".out", new File(blockWorkFlow.getJarDirectory()));
+            File inputFile  = new File(inputFileTmp.getAbsolutePath());
+            File outputFile = new File(outputFileTmp.getAbsolutePath());
 
             //Serialize and write BlockData object to a file
             FileOutputStream fos = new FileOutputStream(inputFile);
@@ -264,10 +278,10 @@ public class BlockObservation extends Observable implements Observer, Runnable {
             String vmargs = System.getProperty("workflow.designer.vm.args");
             vmargs = vmargs != null ? vmargs : defaultVmArgs;
             String[]args=new String[]{"java", vmargs, "-cp",jarFile.getAbsolutePath() ,"cz.zcu.kiv.WorkflowDesigner.BlockObservation",inputFile.getAbsolutePath(),outputFile.getAbsolutePath(),getModule().split(":")[1]};
-            logger.info("Passing arguments" + Arrays.toString(args));
+            logger.info("Passing arguments" + Arrays.toString(args)+", in jobID "+jobID);
             ProcessBuilder pb = new ProcessBuilder(args);
             //Store output and error streams to files
-            logger.info("Executing jar file "+jarFilePath);
+            logger.info("Executing jar file "+jarFilePath+", in jobID "+jobID);
             File stdOutFile = new File("std_output.log");
             pb.redirectOutput(stdOutFile);
             File stdErrFile = new File("std_error.log");
@@ -282,7 +296,7 @@ public class BlockObservation extends Observable implements Observer, Runnable {
             is.read(b,0,b.length);
             String errorString = new String(b);
             if(!errorString.isEmpty()){
-                logger.error(errorString);
+                logger.error(errorString+", in jobID "+jobID);
                 stdErr.append(errorString);
             }
 
@@ -291,7 +305,7 @@ public class BlockObservation extends Observable implements Observer, Runnable {
             is.read(b,0,b.length);
             String outputString = new String(b);
             if(!outputString.isEmpty()){
-                logger.info(outputString);
+                logger.info(outputString+", in jobID "+jobID);
                 stdOut.append(outputString);
             }
 
@@ -313,7 +327,7 @@ public class BlockObservation extends Observable implements Observer, Runnable {
                 }
             }
             else{
-                String err = "Output file does not exist";
+                String err = "Output file does not exist for block "+id+" "+name+", in jobID "+jobID;
                 if(processErr != null && !processErr.isEmpty()){
                     err = processErr;
                 }
@@ -323,7 +337,7 @@ public class BlockObservation extends Observable implements Observer, Runnable {
         catch (Exception e) {
             e.printStackTrace();
             stdErr.append(org.apache.commons.lang3.exception.ExceptionUtils.getStackTrace(e));
-            logger.error("Error executing Jar file", e);
+            logger.error("Error executing Jar file for block "+id+" "+name +", in jobID "+jobID, e);
             throw e;
         }
         return output;
@@ -337,7 +351,7 @@ public class BlockObservation extends Observable implements Observer, Runnable {
      * update the JSON file of "blocks"
      */
     public void updateJSON(boolean error, String stdErr, String stdOut) throws IOException {
-        logger.info("Update JSON for blocl "+getId()+", name = "+getName() );
+        logger.info("Update JSON for blocl "+getId()+", name = "+getName() +", in jobID "+jobID);
 
         blockObject.put("error", error);
         blockObject.put("stderr", stdErr);
@@ -404,7 +418,7 @@ public class BlockObservation extends Observable implements Observer, Runnable {
 
         synchronized (blocksArray){
             //Save Present JSON (with outputs, errors) to the original file
-            logger.info("Update blocksArray JSON in workflowOutputFile for block id = "+ getId() +", name = "+ getName());
+            logger.info("Update blocksArray JSON in workflowOutputFile for block id = "+ getId() +", name = "+ getName()+", in jobID "+jobID);
             if(workflowOutputFile!=null){
                 File workflowOutput = new File(workflowOutputFile);
                 FileUtils.writeStringToFile(workflowOutput, blocksArray.toString(4), Charset.defaultCharset());
@@ -422,7 +436,7 @@ public class BlockObservation extends Observable implements Observer, Runnable {
      *
      */
     public BlockData connectIO() throws IllegalAccessException {
-        logger.info(" Connect all the Inputs of BlockObservation[ ID = "+this.id+", " +this.name+" ] with its SourceOutputs.");
+        logger.info(" Connect all the Inputs of BlockObservation[ ID = "+this.id+", " +this.name+" ] with its SourceOutputs."+", in jobID "+jobID);
         BlockData blockData = new BlockData(getName());//for normal data
 
         if(!stream){
@@ -558,7 +572,7 @@ public class BlockObservation extends Observable implements Observer, Runnable {
             }
         }
 
-        logger.info("Initialized I/O/properties of BlockID "+getId()+", name "+getName()+" block from annotations");
+        logger.info("Initialized I/O/properties of BlockID "+getId()+", name "+getName()+" block from annotations"+", in jobID "+jobID);
 
     }
 
@@ -570,7 +584,7 @@ public class BlockObservation extends Observable implements Observer, Runnable {
     public void assignProperties(JSONObject blockObject) throws IllegalAccessException{
 
         if(properties == null || properties.isEmpty()) return;
-        logger.info("Assign the value of properties for block "+getId()+", "+getName());
+        logger.info("Assign the value of properties for block "+getId()+", "+getName()+", in jobID "+jobID);
 
         //"values": {
         //      "File": "/Users/xxxxx/Desktop/INCF/input.txt"
@@ -633,7 +647,7 @@ public class BlockObservation extends Observable implements Observer, Runnable {
             if (f.getType().equals(File.class)) {//stream data is file Input Stream ()
                 //If type is file, instance of the actual file is passed rather than just the location
                 //return new File( blockWorkFlow.getRemoteDirectory() + File.separator + values.getString(key));
-                logger.info("Assign FileName " + values.getString(key));
+                logger.info("Assign FileName " + values.getString(key)+", in jobID "+jobID);
                 return new File( blockWorkFlow.getRemoteDirectory() + File.separator + values.getString(key));
             }
             else if (f.getType().equals(int.class) || f.getType().equals(Integer.class))

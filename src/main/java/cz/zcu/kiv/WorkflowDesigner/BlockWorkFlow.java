@@ -57,6 +57,10 @@ public class BlockWorkFlow {
     private Set<Integer> startBlocksSet;
     private int[] count = new int[1];
 
+
+    private long jobID;//one workFlow one jobID
+
+
     /**
      * Constructor for building BlockTrees for front-End  -- (Front-End call: initializeBlocks)
      */
@@ -70,11 +74,13 @@ public class BlockWorkFlow {
     /**
      * Constructor to execute the Continuous WorkFlow -- (Front-End call: execute)
      */
-    public BlockWorkFlow(ClassLoader classLoader, Map<Class, String> moduleSource, String jarDirectory, String remoteDirectory) {
+    public BlockWorkFlow(ClassLoader classLoader, Map<Class, String> moduleSource, String jarDirectory, String remoteDirectory, long jobID) {
         this.remoteDirectory = remoteDirectory;
         this.classLoader = classLoader;
         this.moduleSource = moduleSource;
         this.jarDirectory = jarDirectory;
+        this.jobID = jobID;
+
     }
 
 
@@ -134,6 +140,7 @@ public class BlockWorkFlow {
         currBlock.setModule(moduleStr);
         currBlock.setDescription(description);
         currBlock.setJarExecutable(jarExecutable);
+        currBlock.setJobID(jobID);
 
         return currBlock;
     }

@@ -68,7 +68,7 @@ public class WorkflowDesignerTest {
 
 
 
-        JSONArray jsonArray = new BlockWorkFlow(ClassLoader.getSystemClassLoader(), moduleSource,null,"test_data").execute(jsonObject,"test_data",outputFile.getAbsolutePath());
+        JSONArray jsonArray = new BlockWorkFlow(ClassLoader.getSystemClassLoader(), moduleSource,null,"test_data",1).execute(jsonObject,"test_data",outputFile.getAbsolutePath());
 
         assert jsonArray !=null;
         assert jsonArray.getJSONObject(0).getJSONObject("output").getInt("value")==15;
@@ -92,7 +92,7 @@ public class WorkflowDesignerTest {
         moduleSource.put(classA, ":test");
         moduleSource.put(classB, ":test");
 
-        JSONArray jsonArray = new BlockWorkFlow(ClassLoader.getSystemClassLoader(), moduleSource, null,"test_data").execute(jsonObject,"test_data",outputFile.getAbsolutePath());
+        JSONArray jsonArray = new BlockWorkFlow(ClassLoader.getSystemClassLoader(), moduleSource, null,"test_data",2).execute(jsonObject,"test_data",outputFile.getAbsolutePath());
         assert jsonArray !=null;
         assert jsonArray.length() == 2;
     }
