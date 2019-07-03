@@ -351,74 +351,75 @@ public class BlockObservation extends Observable implements Observer, Runnable {
      * update the JSON file of "blocks"
      */
     public void updateJSON(boolean error, String stdErr, String stdOut) throws IOException {
-        logger.info("Update JSON for blocl "+getId()+", name = "+getName() +", in jobID "+jobID);
-
-        blockObject.put("error", error);
-        blockObject.put("stderr", stdErr);
-        blockObject.put("stdout", stdOut);
-        blockObject.put("completed", true);
-
-        JSONObject JSONOutput = new JSONObject();
-        if(finalOutputObject==null){
-            JSONOutput = null;
-        }  else if (finalOutputObject.getClass().equals(String.class)){
-
-            JSONOutput.put("type","STRING");
-            JSONOutput.put("value",finalOutputObject);
-
-        }  else if (finalOutputObject.getClass().equals(File.class)){
-
-            File file = (File) finalOutputObject;
-            String destinationFileName="file_"+new Date().getTime()+"_"+file.getName();
-            FileUtils.moveFile(file, new File(outputFolder + File.separator + destinationFileName));
-            JSONOutput.put("type", "FILE");
-            JSONObject fileObject = new JSONObject();
-            fileObject.put("title", file.getName());
-            fileObject.put("filename", destinationFileName);
-            JSONOutput.put("value", fileObject);
-
-        }else if (finalOutputObject.getClass().equals(Table.class)){
-
-            Table table=(Table)finalOutputObject;
-            JSONOutput.put("type", "TABLE");
-            JSONOutput.put("value", table.toJSON());
-            File file =File.createTempFile("temp_",".csv");
-            FileUtils.writeStringToFile(file,table.toCSV(), Charset.defaultCharset());
-            String destinationFileName = "table_" + new Date().getTime() + ".csv";
-            FileUtils.moveFile(file, new File(outputFolder + File.separator + destinationFileName));
-            JSONObject fileObject=new JSONObject();
-            fileObject.put("title", destinationFileName);
-            fileObject.put("filename", destinationFileName);
-            JSONOutput.put("value", fileObject);
-
-        }
-        else if (finalOutputObject.getClass().equals(Graph.class)){
-
-            Graph graph=(Graph)finalOutputObject;
-            JSONOutput.put("type", "GRAPH");
-            JSONOutput.put("value", graph.toJSON());
-            File file =File.createTempFile("temp_",".json");
-            FileUtils.writeStringToFile(file, graph.toJSON().toString(4), Charset.defaultCharset());
-            String destinationFileName = "graph_"+ new Date().getTime() + ".json";
-            FileUtils.moveFile(file, new File(outputFolder + File.separator + destinationFileName));
-            JSONObject fileObject=new JSONObject();
-            fileObject.put("title", destinationFileName);
-            fileObject.put("filename", destinationFileName);
-            JSONOutput.put("value", fileObject);
-
-        }
-        else{
-            JSONOutput.put("type","");
-            JSONOutput.put("value",finalOutputObject.toString());
-        }
-
-        if (JSONOutput != null)
-            blockObject.put("output", JSONOutput);
-
-
         synchronized (blocksArray){
+
+            logger.info("Update JSON for block "+getId()+", name = "+getName() +", in jobID "+jobID);
+
+            blockObject.put("error", error);
+            blockObject.put("stderr", stdErr);
+            blockObject.put("stdout", stdOut);
+            blockObject.put("completed", true);
+
+            JSONObject JSONOutput = new JSONObject();
+            if(finalOutputObject==null){
+                JSONOutput = null;
+            }  else if (finalOutputObject.getClass().equals(String.class)){
+
+                JSONOutput.put("type","STRING");
+                JSONOutput.put("value",finalOutputObject);
+
+            }  else if (finalOutputObject.getClass().equals(File.class)){
+
+                File file = (File) finalOutputObject;
+                String destinationFileName="file_"+new Date().getTime()+"_"+file.getName();
+                FileUtils.moveFile(file, new File(outputFolder + File.separator + destinationFileName));
+                JSONOutput.put("type", "FILE");
+                JSONObject fileObject = new JSONObject();
+                fileObject.put("title", file.getName());
+                fileObject.put("filename", destinationFileName);
+                JSONOutput.put("value", fileObject);
+
+            }else if (finalOutputObject.getClass().equals(Table.class)){
+
+                Table table=(Table)finalOutputObject;
+                JSONOutput.put("type", "TABLE");
+                JSONOutput.put("value", table.toJSON());
+                File file =File.createTempFile("temp_",".csv");
+                FileUtils.writeStringToFile(file,table.toCSV(), Charset.defaultCharset());
+                String destinationFileName = "table_" + new Date().getTime() + ".csv";
+                FileUtils.moveFile(file, new File(outputFolder + File.separator + destinationFileName));
+                JSONObject fileObject=new JSONObject();
+                fileObject.put("title", destinationFileName);
+                fileObject.put("filename", destinationFileName);
+                JSONOutput.put("value", fileObject);
+
+            }
+            else if (finalOutputObject.getClass().equals(Graph.class)){
+
+                Graph graph=(Graph)finalOutputObject;
+                JSONOutput.put("type", "GRAPH");
+                JSONOutput.put("value", graph.toJSON());
+                File file =File.createTempFile("temp_",".json");
+                FileUtils.writeStringToFile(file, graph.toJSON().toString(4), Charset.defaultCharset());
+                String destinationFileName = "graph_"+ new Date().getTime() + ".json";
+                FileUtils.moveFile(file, new File(outputFolder + File.separator + destinationFileName));
+                JSONObject fileObject=new JSONObject();
+                fileObject.put("title", destinationFileName);
+                fileObject.put("filename", destinationFileName);
+                JSONOutput.put("value", fileObject);
+
+            }
+            else{
+                JSONOutput.put("type","");
+                JSONOutput.put("value",finalOutputObject.toString());
+            }
+
+            if (JSONOutput != null)
+                blockObject.put("output", JSONOutput);
+
+
             //Save Present JSON (with outputs, errors) to the original file
-            logger.info("Update blocksArray JSON in workflowOutputFile for block id = "+ getId() +", name = "+ getName()+", in jobID "+jobID);
+            logger.info("-Update blocksArray JSON in workflowOutputFile for block id = "+ getId() +", name = "+ getName()+", in jobID "+jobID);
             if(workflowOutputFile!=null){
                 File workflowOutput = new File(workflowOutputFile);
                 FileUtils.writeStringToFile(workflowOutput, blocksArray.toString(4), Charset.defaultCharset());
@@ -456,7 +457,7 @@ public class BlockObservation extends Observable implements Observer, Runnable {
 
         if(inputs == null || inputs.isEmpty()) return blockData;
 
-        Map<Integer, BlockObservation> indexBlocksMap = blockWorkFlow.getIndexBlocksMap();
+        //Map<Integer, BlockObservation> indexBlocksMap = blockWorkFlow.getIndexBlocksMap();
         for(String destinationParam : IOMap.keySet()){
 
             //get SourceBlocks if it is list[]
