@@ -134,6 +134,7 @@ public class BlockWorkFlow {
         String blockTypeFamily = (String)blockType.getDeclaredMethod("family").invoke(annotation);
         String description = (String)blockType.getDeclaredMethod("description").invoke(annotation);
         Boolean jarExecutable = (Boolean) blockType.getDeclaredMethod("runAsJar").invoke(annotation);
+        Boolean jarRMI = (Boolean) blockType.getDeclaredMethod("jarRMI").invoke(annotation);
 
         currBlock.setName(blockTypeName);
         currBlock.setFamily(blockTypeFamily);
@@ -141,6 +142,7 @@ public class BlockWorkFlow {
         currBlock.setDescription(description);
         currBlock.setJarExecutable(jarExecutable);
         currBlock.setJobID(jobID);
+        currBlock.setRmiFlag(jarRMI);
 
         return currBlock;
     }
