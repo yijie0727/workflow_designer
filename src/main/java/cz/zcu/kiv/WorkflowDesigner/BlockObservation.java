@@ -268,11 +268,21 @@ public class BlockObservation extends Observable implements Observer, Runnable {
 
         String url = "rmi://localhost:" + port + "/IRemoteData";
         Naming.rebind(url, remoteDataImpleServer); //  rebind the designated remote object
- System.out.println("Server registers in port "+ port+",  block "+getId()+", "+getName());
+        System.out.println("Server registers in port "+ port+",  block "+getId()+", "+getName());
 
         return remoteObj;
     }
 
+    /**
+     * generatePort()
+     * create unique port id used in rmi
+     */
+    private int generatePort(){
+        int port = (int)(jobID%1024)*10 + 1024 + id*100;
+        if(port == 8680)
+            return port + id*100;
+        return port;
+    }
 
     /**
      * Execute block externally as a JAR - Joey Pinto
@@ -308,7 +318,7 @@ public class BlockObservation extends Observable implements Observer, Runnable {
             // execute as jar and fetch blockData through RMI, otherwise through FILE
             if (rmiFlag) {
 
-                int port = 1024+id;//set an unique port number
+                int port = generatePort();//set an unique port number
                 remoteObj = this.prepareRMI(port);
 
                 args = new String[]{"java", vmargs, "-cp", jarFile.getAbsolutePath(), "cz.zcu.kiv.WorkflowDesigner.BlockObservation", blockIdName,    String.valueOf(port),   getModule().split(":")[1],   "RMI"};
