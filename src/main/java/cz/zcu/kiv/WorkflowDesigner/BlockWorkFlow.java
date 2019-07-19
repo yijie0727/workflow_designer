@@ -364,15 +364,16 @@ public class BlockWorkFlow {
                 Class<? extends Annotation> blockType = annotation.annotationType();
                 String blockTypeName = (String)blockType.getDeclaredMethod("type").invoke(annotation);
 
-                boolean flagTmp = (boolean)blockType.getDeclaredMethod("continuousFlag").invoke(annotation);
-                if(i != 0 && continuousFlag != flagTmp){
-                    throw new WrongTypeException();
-                }
-                continuousFlag = flagTmp;
-
                 if(blockTypeName.equals(blockTypeStr)){
                     currBlock = createBlockInstance(blockClass, module, blocksArray, workflowOutputFile);
                     currBlock.setId(id);
+
+                    boolean flagTmp = (boolean)blockType.getDeclaredMethod("continuousFlag").invoke(annotation);
+                    if(i != 0 && continuousFlag != flagTmp){
+                        throw new WrongTypeException();
+                    }
+                    continuousFlag = flagTmp;
+
                     break;
                 }
             }

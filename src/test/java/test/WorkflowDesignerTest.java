@@ -147,7 +147,7 @@ public class WorkflowDesignerTest {
         Pack.assignModuleSource(moduleSource, blockTypes);
 
 
-        JSONArray jsonArray = new BlockWorkFlow(ClassLoader.getSystemClassLoader(), moduleSource, null,"test_data",3).
+        JSONArray jsonArray = new BlockWorkFlow(ClassLoader.getSystemClassLoader(), moduleSource, null,"test_data",4).
                 execute(  jsonObject,  "test_data",  outputFile.getAbsolutePath());
         assert jsonArray !=null;
         assert jsonArray.length() == 2;
