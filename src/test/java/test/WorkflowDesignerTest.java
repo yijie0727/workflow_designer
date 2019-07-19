@@ -122,7 +122,7 @@ public class WorkflowDesignerTest {
 
 
         JSONArray jsonArray = new BlockWorkFlow(ClassLoader.getSystemClassLoader(), moduleSource, null,"test_data",3).
-                execute(  jsonObject,  "test_data",  outputFile.getAbsolutePath(),   true);
+                execute(  jsonObject,  "test_data",  outputFile.getAbsolutePath());
         assert jsonArray !=null;
         assert jsonArray.length() == 4;
     }
@@ -130,7 +130,7 @@ public class WorkflowDesignerTest {
 
     @Test
     public void testContinuous2() throws IOException, NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException, FieldMismatchException, InterruptedException{
-        String json = FileUtils.readFileToString(new File("test_data/pipedStreamTest2.json"), Charset.defaultCharset());
+        String json = FileUtils.readFileToString(new File("test_data/pipeTest2.json"), Charset.defaultCharset());
 
         JSONObject jsonObject = new JSONObject(json);
         File outputFile = File.createTempFile("testBlockPipeStream",".json");
@@ -147,7 +147,7 @@ public class WorkflowDesignerTest {
 
 
         JSONArray jsonArray = new BlockWorkFlow(ClassLoader.getSystemClassLoader(), moduleSource, null,"test_data",3).
-                execute(  jsonObject,  "test_data",  outputFile.getAbsolutePath(),   true);
+                execute(  jsonObject,  "test_data",  outputFile.getAbsolutePath());
         assert jsonArray !=null;
         assert jsonArray.length() == 2;
     }
