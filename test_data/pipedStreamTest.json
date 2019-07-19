@@ -1,0 +1,92 @@
+{
+  "edges": [
+    {
+      "id": 1,
+      "block1": 1,
+      "connector1": [
+        "PipeOut",
+        "output"
+      ],
+      "block2": 3,
+      "connector2": [
+        "PipeIn1",
+        "input"
+      ]
+    },
+    {
+      "id": 2,
+      "block1": 1,
+      "connector1": [
+        "PipeOut",
+        "output"
+      ],
+      "block2": 4,
+      "connector2": [
+        "PipeIn1",
+        "input"
+      ]
+    },
+    {
+      "id": 3,
+      "block1": 2,
+      "connector1": [
+        "PipeOut",
+        "output"
+      ],
+      "block2": 3,
+      "connector2": [
+        "PipeIn2",
+        "input"
+      ]
+    },
+    {
+      "id": 4,
+      "block1": 2,
+      "connector1": [
+        "PipeOut",
+        "output"
+      ],
+      "block2": 4,
+      "connector2": [
+        "PipeIn2",
+        "input"
+      ]
+    }
+  ],
+  "blocks": [
+    {
+      "id": 1,
+      "x": -496,
+      "y": -107,
+      "type": "DataProvider1",
+      "module": "test.jar:test",
+      "values": {
+        "msg Number": "5"
+      }
+    },
+    {
+      "id": 2,
+      "x": -249,
+      "y": 9,
+      "type": "DataProvider2",
+      "module": "test.jar:test",
+      "values": {}
+    },
+    {
+      "id": 3,
+      "x": -4,
+      "y": -17,
+      "type": "DataReceiver1",
+      "module": "test.jar:test",
+      "values": {}
+    },
+    {
+      "id": 4,
+      "x": -48,
+      "y": -17,
+      "type": "DataReceiver2",
+      "module": "test.jar:test",
+      "values": {}
+    }
+  ]
+}

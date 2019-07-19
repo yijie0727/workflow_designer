@@ -51,7 +51,7 @@ import static cz.zcu.kiv.WorkflowDesigner.Type.STREAM;
  ***********************************************************************************************************************
  *
  * Block, 2018/16/05 13:32 Joey Pinto
- * BlockObservation, 2019 GSoC P1 Yijie Huang
+ * BlockObservation, 2019 GSoC P1 P2 Yijie Huang
  *
  * In 2018, This file is the model for a single block in the workflow designer tool.
  * In 2019, it implements Observer Pattern design, making destination block execute
@@ -100,17 +100,18 @@ public class BlockObservation extends Observable implements Observer, Runnable {
     private IRemoteData remoteDataImpleServer;
 
 
+    //Fields for continuous stream model (no cumulative data in blocks) (pipe)
+    private PipedOutputStream[] pipedOuts;
+    private PipedInputStream[] pipedInsTransit;
+    private PipedOutputStream[] pipedOutsTransit;
+    private PipedInputStream[] pipedIns;
+    private Map<String, PipedOutputStream>   inTransitsMap;            //store Map<inputName(unique annotation name):  corresponding pipedOutsTransit     (connect this block's input's PipedInTransit)>
+    private Map<String, PipedInputStream>    outTransitReadMap;        //store Map<outputName(unique annotation name): corresponding pipedInsTransit      (connect this block's output's PipedInTransit)>
+    private Map<String, List<PipedOutputStream>> outTransitWriteMap;   //store Map<outputName(unique annotation name): corresponding pipedOutsTransitList (connect next blocks' input's PipeOutTransit)>
+
+
     //var for workFlow jobID: same workflow same jobID
     private long jobID;
-
-    public long getJobID() {
-        return jobID;
-    }
-
-    public void setJobID(long jobID) {
-        this.jobID = jobID;
-    }
-
 
 
     public BlockObservation(Object context, BlockWorkFlow blockWorkFlow, JSONArray blocksArray, String workflowOutputFile) {
@@ -119,6 +120,81 @@ public class BlockObservation extends Observable implements Observer, Runnable {
         this.blocksArray = blocksArray;
         this.workflowOutputFile = workflowOutputFile;
     }
+
+
+    /**
+     * assignPipeTransit - Yijie Huang
+     * assign the PipedOutputStream and PipedInputStream;
+     * and Map<String, PipedOutputStream>   inTransitsMap;
+     * Map<String, PipedInputStream>    outTransitReadMap
+     */
+    public void assignPipeTransit() throws IllegalAccessException, IOException {
+
+        int outNum = 0, inNum = 0;
+
+        if( outputs != null && outputs.size() != 0) {
+            outNum = outputs.size();
+            pipedOuts       = new PipedOutputStream[outNum];
+            pipedInsTransit = new PipedInputStream[outNum];
+        }
+
+        if( inputs != null  && inputs.size() != 0) {
+            inNum = inputs.size();
+            pipedOutsTransit = new PipedOutputStream[inNum];
+            pipedIns         = new PipedInputStream[inNum];
+        }
+
+        // connect original outputs pipedOutputStream and pipedInputTransits
+        if(outNum != 0){
+            outTransitReadMap  = new HashMap<>();
+            outTransitWriteMap = new HashMap<>();  //empty now, entity will be put in BlockWorkFlow.java
+
+            int i = 0;
+            Field[] outputFields = context.getClass().getDeclaredFields();
+            for (Field f : outputFields) {
+                f.setAccessible(true);
+
+                BlockOutput blockOutput = f.getAnnotation(BlockOutput.class);
+                if (blockOutput != null) {
+
+                    pipedOuts[i] = (PipedOutputStream) f.get(context);
+                    pipedInsTransit[i] = new PipedInputStream();
+                    pipedOuts[i].connect(pipedInsTransit[i]);
+
+                    outTransitReadMap.put(blockOutput.name(), pipedInsTransit[i]);
+
+                    i++;
+
+                }
+            }
+        }
+
+        // connect pipedOutputTransits and original inputs pipedInputStream
+        if(inNum != 0){
+            inTransitsMap = new HashMap<>();
+            int j = 0;
+            Field[] inputFields =  context.getClass().getDeclaredFields();
+            for (Field f : inputFields) {
+                f.setAccessible(true);
+
+                BlockInput blockInput = f.getAnnotation(BlockInput.class);
+                if (blockInput != null) {
+
+                    pipedOutsTransit[j] = new PipedOutputStream();
+                    pipedIns[j] = (PipedInputStream) f.get(context);
+                    pipedOutsTransit[j].connect(pipedIns[j]);
+
+                    inTransitsMap.put(blockInput.name(), pipedOutsTransit[j]);
+
+                    j++;
+
+                }
+            }
+        }
+
+
+    }
+
 
     /**
      * run - Yijie Huang
@@ -1083,11 +1159,82 @@ public class BlockObservation extends Observable implements Observer, Runnable {
         this.count = count;
     }
 
+    public long getJobID() {
+        return jobID;
+    }
+
+    public void setJobID(long jobID) {
+        this.jobID = jobID;
+    }
+
+
+
+
     public boolean isRmiFlag() {
         return rmiFlag;
     }
 
     public void setRmiFlag(boolean rmiFlag) {
         this.rmiFlag = rmiFlag;
+    }
+
+
+
+
+
+    public PipedOutputStream[] getPipedOuts() {
+        return pipedOuts;
+    }
+
+    public void setPipedOuts(PipedOutputStream[] pipedOuts) {
+        this.pipedOuts = pipedOuts;
+    }
+
+    public PipedInputStream[] getPipedInsTransit() {
+        return pipedInsTransit;
+    }
+
+    public void setPipedInsTransit(PipedInputStream[] pipedInsTransit) {
+        this.pipedInsTransit = pipedInsTransit;
+    }
+
+    public PipedOutputStream[] getPipedOutsTransit() {
+        return pipedOutsTransit;
+    }
+
+    public void setPipedOutsTransit(PipedOutputStream[] pipedOutsTransit) {
+        this.pipedOutsTransit = pipedOutsTransit;
+    }
+
+    public PipedInputStream[] getPipedIns() {
+        return pipedIns;
+    }
+
+    public void setPipedIns(PipedInputStream[] pipedIns) {
+        this.pipedIns = pipedIns;
+    }
+
+    public Map<String, PipedOutputStream> getInTransitsMap() {
+        return inTransitsMap;
+    }
+
+    public void setInTransitsMap(Map<String, PipedOutputStream> inTransitsMap) {
+        this.inTransitsMap = inTransitsMap;
+    }
+
+    public Map<String, PipedInputStream> getOutTransitReadMap() {
+        return outTransitReadMap;
+    }
+
+    public void setOutTransitReadMap(Map<String, PipedInputStream> outTransitReadMap) {
+        this.outTransitReadMap = outTransitReadMap;
+    }
+
+    public Map<String, List<PipedOutputStream>> getOutTransitWriteMap() {
+        return outTransitWriteMap;
+    }
+
+    public void setOutTransitWriteMap(Map<String, List<PipedOutputStream>> outTransitWriteMap) {
+        this.outTransitWriteMap = outTransitWriteMap;
     }
 }

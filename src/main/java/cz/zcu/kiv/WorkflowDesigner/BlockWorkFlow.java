@@ -8,9 +8,14 @@ import org.json.JSONObject;
 import org.reflections.Reflections;
 
 import java.io.IOException;
+import java.io.PipedInputStream;
+import java.io.PipedOutputStream;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationTargetException;
 import java.util.*;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 /***********************************************************************************************************************
  *
@@ -34,7 +39,7 @@ import java.util.*;
  ***********************************************************************************************************************
  *
  * Workflow, 2018/17/05 6:32 Joey Pinto
- * BlockWorkFlow, 2019 GSoC P1 Yijie Huang
+ * BlockWorkFlow, 2019 GSoC P1 P2 Yijie Huang
  *
  * This file hosts the methods used to dynamically create the Javascript files needed for the workflow designer
  * Front end sends JSON to it to initialize block tree and execute workFlow.
@@ -147,6 +152,141 @@ public class BlockWorkFlow {
         return currBlock;
     }
 
+
+    /**
+     * assignOutputWrites - Yijie Huang
+     * assign each source block's  Map<String, List<PipedOutputStream>> outTransitWriteMap,
+     * connect source block's output with all its next destination blocks' inputs
+     */
+    public void assignOutputWrites(JSONArray edgesArray){
+        logger.info("put entity into outputWriteMap for each source block");
+
+        for(int i = 0; i<edgesArray.length(); i++){
+            JSONObject edge = edgesArray.getJSONObject(i);
+
+            int block1ID = edge.getInt("block1");
+            BlockObservation block1 = indexBlocksMap.get(block1ID);
+            String sourceParam = edge.getJSONArray("connector1").getString(0);
+
+            int block2ID = edge.getInt("block2");
+            BlockObservation block2 = this.indexBlocksMap.get(block2ID);
+            String destinationParam = edge.getJSONArray("connector2").getString(0);
+
+            Map<String, List<PipedOutputStream>> outTransitWriteMap = block1.getOutTransitWriteMap();
+            Map<String, PipedOutputStream>   inTransitsMap = block2.getInTransitsMap();
+            if(!outTransitWriteMap.containsKey(sourceParam))
+                outTransitWriteMap.put(sourceParam, new ArrayList<PipedOutputStream>());
+
+            PipedOutputStream outTransit = inTransitsMap.get(destinationParam);
+            outTransitWriteMap.get(sourceParam).add(outTransit);
+        }
+
+    }
+
+    /**
+     * assignPipes - Yijie Huang
+     */
+    public int assignPipes( ) throws IllegalAccessException, IOException{
+        logger.info("assign PipedTransit for each block");
+
+        int inputsNum = 0;
+        for(int id: indexBlocksMap.keySet()){
+            BlockObservation block = indexBlocksMap.get(id);
+            block.assignPipeTransit();
+
+            if(block.getInputs()!= null)
+                inputsNum += block.getInputs().size();
+        }
+
+        return inputsNum;
+    }
+
+
+    /**
+     * execute2 - Yijie Huang
+     *
+     * This method receives front end workflow's JSON file and to execute the workFlow
+     * only for stream blocks which connect one @BlockOutput (type is STREAM), and one @BlockInput (type is STREAM)
+     * using PipedInputStream and PipedOutputStream
+     * to deal with the stream continuously instead of cumulatively
+     *
+     * @param jObject               SONObject contains Blocks and Edges info
+     * @param outputFolder          Folder to save the output File
+     * @param workflowOutputFile    File workflowOutputFile = File.createTempFile("job_"+getId(),".json",new File(WORKING_DIRECTORY));
+     *                                  -- > File to put the Blocks JSONArray info with the output info, stdout, stderr, error info after the execution
+     * @param pipe true:  execute the whole workflow, using pipedInputStream and pipedOutputStream to connect all the blocks' @BlockInput and @BlockOutput
+     *             false: call public JSONArray execute(JSONObject jObject, String outputFolder, String workflowOutputFile), execute normally
+     */
+    public JSONArray execute(JSONObject jObject, String outputFolder, String workflowOutputFile, boolean pipe) throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException, InstantiationException, FieldMismatchException, InterruptedException {
+
+        if (!pipe){
+            return execute(jObject, outputFolder, workflowOutputFile);
+        }
+
+        logger.info(" Pipe = TRUE,  Start Continuous WorkFlow Execution …………………… ");
+
+        JSONArray blocksArray = jObject.getJSONArray("blocks");
+        JSONArray edgesArray  = jObject.getJSONArray("edges");
+        errorFlag[0] = false;
+
+        mapIndexBlock(blocksArray, outputFolder, workflowOutputFile);
+
+        int pipesInputsNum = assignPipes();
+
+        assignOutputWrites(edgesArray);
+
+
+        int poolSize  = blocksArray.length() + pipesInputsNum;
+        ThreadPoolExecutor threadPool = new ThreadPoolExecutor(poolSize, poolSize, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<Runnable>(poolSize), new ThreadPoolExecutor.AbortPolicy());
+
+
+        logger.info("……………………………………………………………………   Submit ContinuousBlockThread to threadPool:  ……………………………………………………………………");
+        for(int id: indexBlocksMap.keySet()){
+            BlockObservation currBlock = indexBlocksMap.get(id);
+            ContinuousBlockThread currTask = new ContinuousBlockThread(id, currBlock, errorFlag);
+            threadPool.execute(currTask);
+        }
+
+        logger.info("……………………………………………………………………   Submit PipeTransitThread to threadPool:  ………………………………………………………………………………");
+        for(int id: indexBlocksMap.keySet()){
+            BlockObservation block = indexBlocksMap.get(id);
+            if(block.getOutTransitReadMap()  == null) continue; // skip blocks without outputs(the las blocks in the workFlows)
+
+            Map<String, PipedInputStream>        outTransitReadMap  = block.getOutTransitReadMap();
+            Map<String, List<PipedOutputStream>> outTransitWriteMap = block.getOutTransitWriteMap();
+
+            for(String outputName: outTransitReadMap.keySet()){
+
+                PipedInputStream pipedInTransit = outTransitReadMap.get(outputName);
+                List<PipedOutputStream> pipedOutTransitsList = outTransitWriteMap.get(outputName);
+
+                threadPool.execute(  new PipeTransitThread(id, outputName,  pipedInTransit,  pipedOutTransitsList)  );
+
+            }
+        }
+
+        threadPool.shutdown();
+        boolean loop;
+        do {
+            loop = !threadPool.awaitTermination(2, TimeUnit.SECONDS);
+        } while(loop && !errorFlag[0]);
+
+        threadPool.shutdownNow();
+        logger.info("………………………………………………………………………………………  ShutDown threadPool  …………………………………………………………………………………………………………………… ");
+
+
+
+
+        if(!errorFlag[0])
+            logger.info( "Workflow Execution completed successfully!");
+        else
+            logger.error("Workflow Execution failed!");
+
+
+        return blocksArray;
+    }
+
+
     /**
      * execute - Yijie Huang, Joey Pinto
      *
@@ -157,7 +297,7 @@ public class BlockWorkFlow {
      *                                  -- > File to put the Blocks JSONArray info with the output info, stdout, stderr, error info after the execution
      */
     public JSONArray execute(JSONObject jObject, String outputFolder, String workflowOutputFile) throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException, InstantiationException, FieldMismatchException, InterruptedException {
-        logger.info(" Start Continuous WorkFlow Execution …… ");
+        logger.info(" Pipe = FALSE,  Start Cumulative WorkFlow Execution …………………… ");
 
         JSONArray blocksArray = jObject.getJSONArray("blocks");
         JSONArray edgesArray  = jObject.getJSONArray("edges");

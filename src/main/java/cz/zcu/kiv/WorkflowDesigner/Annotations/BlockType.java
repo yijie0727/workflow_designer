@@ -13,5 +13,5 @@ public @interface BlockType {
 
     boolean runAsJar() default true;
 
-    boolean jarRMI() default true;
+    boolean jarRMI() default false;
 }
