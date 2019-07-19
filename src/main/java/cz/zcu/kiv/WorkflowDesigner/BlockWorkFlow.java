@@ -66,6 +66,8 @@ public class BlockWorkFlow {
     private long jobID;//one workFlow one jobID
 
 
+    private boolean continuousFlag;
+
     /**
      * Constructor for building BlockTrees for front-End  -- (Front-End call: initializeBlocks)
      */
@@ -203,33 +205,21 @@ public class BlockWorkFlow {
 
 
     /**
-     * execute2 - Yijie Huang
-     *
-     * This method receives front end workflow's JSON file and to execute the workFlow
-     * only for stream blocks which connect one @BlockOutput (type is STREAM), and one @BlockInput (type is STREAM)
-     * using PipedInputStream and PipedOutputStream
-     * to deal with the stream continuously instead of cumulatively
+     * executeContinuous - Yijie Huang
      *
      * @param jObject               SONObject contains Blocks and Edges info
-     * @param outputFolder          Folder to save the output File
-     * @param workflowOutputFile    File workflowOutputFile = File.createTempFile("job_"+getId(),".json",new File(WORKING_DIRECTORY));
-     *                                  -- > File to put the Blocks JSONArray info with the output info, stdout, stderr, error info after the execution
-     * @param pipe true:  execute the whole workflow, using pipedInputStream and pipedOutputStream to connect all the blocks' @BlockInput and @BlockOutput
-     *             false: call public JSONArray execute(JSONObject jObject, String outputFolder, String workflowOutputFile), execute normally
+     *
+     *  if all the @BlockType's continuousFlag are true, then execute in a continuous stream way:
+     *   execute the whole workflow, using pipedInputStream and pipedOutputStream to connect all the blocks' @BlockInput and @BlockOutput
+     *  if all these flags are false:  execute the workFlow in a cumulative data way
      */
-    public JSONArray execute(JSONObject jObject, String outputFolder, String workflowOutputFile, boolean pipe) throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException, InstantiationException, FieldMismatchException, InterruptedException {
-
-        if (!pipe){
-            return execute(jObject, outputFolder, workflowOutputFile);
-        }
-
-        logger.info(" Pipe = TRUE,  Start Continuous WorkFlow Execution …………………… ");
+    public JSONArray executeContinuous(JSONObject jObject) throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException, InstantiationException, FieldMismatchException, InterruptedException {
+        logger.info("  Start Continuous WorkFlow Execution …………………… ");
 
         JSONArray blocksArray = jObject.getJSONArray("blocks");
         JSONArray edgesArray  = jObject.getJSONArray("edges");
         errorFlag[0] = false;
-
-        mapIndexBlock(blocksArray, outputFolder, workflowOutputFile);
+        //mapIndexBlock(blocksArray, outputFolder, workflowOutputFile);
 
         int pipesInputsNum = assignPipes();
 
@@ -288,7 +278,7 @@ public class BlockWorkFlow {
 
 
     /**
-     * execute - Yijie Huang, Joey Pinto
+     * executeCumulative - Yijie Huang, Joey Pinto
      *
      * This method receives front end workflow's JSON file and to execute the workFlow.
      * @param jObject               SONObject contains Blocks and Edges info
@@ -297,16 +287,19 @@ public class BlockWorkFlow {
      *                                  -- > File to put the Blocks JSONArray info with the output info, stdout, stderr, error info after the execution
      */
     public JSONArray execute(JSONObject jObject, String outputFolder, String workflowOutputFile) throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException, InstantiationException, FieldMismatchException, InterruptedException {
-        logger.info(" Pipe = FALSE,  Start Cumulative WorkFlow Execution …………………… ");
 
         JSONArray blocksArray = jObject.getJSONArray("blocks");
         JSONArray edgesArray  = jObject.getJSONArray("edges");
 
-        count[0] = blocksArray.length();
-        errorFlag[0] = false;
-
         //initialize  and  set  map<ID,  BlockObservation> indexBlocksMap(config I/Os and assign properties)
         mapIndexBlock(blocksArray, outputFolder, workflowOutputFile);
+        if(continuousFlag)
+            return executeContinuous(jObject);
+
+        logger.info("  Start Cumulative WorkFlow Execution …………………… ");
+
+        count[0] = blocksArray.length();
+        errorFlag[0] = false;
 
         //initialize IO map and block start list for thread
         mapBlocksIO(edgesArray);
@@ -343,11 +336,15 @@ public class BlockWorkFlow {
      * mapBlockIndex - Yijie Huang, Joey Pinto
      *
      * map all the BlockObservations related in this workflow according to the front-end blocks JSONArray
-     * initialize Map<Integer,  BlockObservation> indexMap, and initialize all the properties
+     * initialize Map<Integer,  BlockObservation> indexMap
+     * initialize all the properties
+     * set continuousFlag to decide whether this workFlow should be executed in a continuous way or cumulative way.
      */
     public void mapIndexBlock(JSONArray blocksArray, String outputFolder, String workflowOutputFile) throws NoSuchMethodException, IllegalAccessException, InvocationTargetException, InstantiationException, FieldMismatchException {
         logger.info("initialize all the related ContinuousBlocks(including I/O/properties initialization) in this workFlow and set the idBlocksMap");
         Map<Integer, BlockObservation> idBlocksMap = new HashMap<>();
+
+
 
         for(int i = 0; i<blocksArray.length(); i++){
             BlockObservation currBlock = null;
@@ -366,6 +363,7 @@ public class BlockWorkFlow {
                 if(annotation == null) continue;
                 Class<? extends Annotation> blockType = annotation.annotationType();
                 String blockTypeName = (String)blockType.getDeclaredMethod("type").invoke(annotation);
+                continuousFlag = (boolean)blockType.getDeclaredMethod("continuousFlag").invoke(annotation);
 
                 if(blockTypeName.equals(blockTypeStr)){
                     currBlock = createBlockInstance(blockClass, module, blocksArray, workflowOutputFile);

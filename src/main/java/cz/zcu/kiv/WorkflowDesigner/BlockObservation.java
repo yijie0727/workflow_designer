@@ -709,12 +709,8 @@ public class BlockObservation extends Observable implements Observer, Runnable {
             BlockOutput blockOutput = f.getAnnotation(BlockOutput.class);
             if (blockOutput != null){
                 String cardinality="";
-                if(blockOutput.type().equals(STREAM)){
-                    cardinality=WorkflowCardinality.ONE_TO_ONE;
-                }
-                else{
-                    cardinality=WorkflowCardinality.MANY_TO_MANY;
-                }
+                cardinality=WorkflowCardinality.MANY_TO_MANY;
+
                 outputs.put(blockOutput.name(),new Data(blockOutput.name(),blockOutput.type(),cardinality));
             }
         }

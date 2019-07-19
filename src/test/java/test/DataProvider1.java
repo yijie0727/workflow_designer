@@ -9,7 +9,7 @@ import java.io.PipedOutputStream;
 
 import static cz.zcu.kiv.WorkflowDesigner.Type.STREAM;
 
-@BlockType(type ="DataProvider1", family = "PIPE")
+@BlockType(type ="DataProvider1", family = "PIPE", continuousFlag = true)
 public class DataProvider1 {
 
     @BlockOutput(name = "PipeOut", type = STREAM)
