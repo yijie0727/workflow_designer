@@ -1163,51 +1163,12 @@ public class BlockObservation extends Observable implements Observer, Runnable {
         this.jobID = jobID;
     }
 
-
-
-
     public boolean isRmiFlag() {
         return rmiFlag;
     }
 
     public void setRmiFlag(boolean rmiFlag) {
         this.rmiFlag = rmiFlag;
-    }
-
-
-
-
-
-    public PipedOutputStream[] getPipedOuts() {
-        return pipedOuts;
-    }
-
-    public void setPipedOuts(PipedOutputStream[] pipedOuts) {
-        this.pipedOuts = pipedOuts;
-    }
-
-    public PipedInputStream[] getPipedInsTransit() {
-        return pipedInsTransit;
-    }
-
-    public void setPipedInsTransit(PipedInputStream[] pipedInsTransit) {
-        this.pipedInsTransit = pipedInsTransit;
-    }
-
-    public PipedOutputStream[] getPipedOutsTransit() {
-        return pipedOutsTransit;
-    }
-
-    public void setPipedOutsTransit(PipedOutputStream[] pipedOutsTransit) {
-        this.pipedOutsTransit = pipedOutsTransit;
-    }
-
-    public PipedInputStream[] getPipedIns() {
-        return pipedIns;
-    }
-
-    public void setPipedIns(PipedInputStream[] pipedIns) {
-        this.pipedIns = pipedIns;
     }
 
     public Map<String, PipedOutputStream> getInTransitsMap() {

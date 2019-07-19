@@ -2,6 +2,7 @@ package test;
 import cz.zcu.kiv.WorkflowDesigner.Annotations.BlockType;
 import cz.zcu.kiv.WorkflowDesigner.BlockWorkFlow;
 import cz.zcu.kiv.WorkflowDesigner.FieldMismatchException;
+import cz.zcu.kiv.WorkflowDesigner.WrongTypeException;
 import org.apache.commons.io.FileUtils;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -54,7 +55,7 @@ public class WorkflowDesignerTest {
     }
 
     @Test
-    public void testJSONArithmeticObservation() throws IOException, NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException, FieldMismatchException, InterruptedException {
+    public void testJSONArithmeticObservation() throws WrongTypeException, IOException, NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException, FieldMismatchException, InterruptedException {
 
         String json = FileUtils.readFileToString(new File("test_data/test.json"),Charset.defaultCharset());
         JSONObject jsonObject = new JSONObject(json);
@@ -80,7 +81,7 @@ public class WorkflowDesignerTest {
 
 
     @Test
-    public void testFileToStreamToFileObservation() throws IOException, NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException, FieldMismatchException, InterruptedException{
+    public void testFileToStreamToFileObservation() throws WrongTypeException, IOException, NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException, FieldMismatchException, InterruptedException{
         String json = FileUtils.readFileToString(new File("test_data/FileToStreamTest.json"), Charset.defaultCharset());
 
         JSONObject jsonObject = new JSONObject(json);
@@ -104,7 +105,7 @@ public class WorkflowDesignerTest {
 
 
     @Test
-    public void testContinuous1() throws IOException, NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException, FieldMismatchException, InterruptedException{
+    public void testContinuous1() throws WrongTypeException, IOException, NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException, FieldMismatchException, InterruptedException{
         String json = FileUtils.readFileToString(new File("test_data/pipedStreamTest.json"), Charset.defaultCharset());
 
         JSONObject jsonObject = new JSONObject(json);
@@ -129,7 +130,7 @@ public class WorkflowDesignerTest {
 
 
     @Test
-    public void testContinuous2() throws IOException, NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException, FieldMismatchException, InterruptedException{
+    public void testContinuous2() throws WrongTypeException,  IOException, NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException, FieldMismatchException, InterruptedException{
         String json = FileUtils.readFileToString(new File("test_data/pipeTest2.json"), Charset.defaultCharset());
 
         JSONObject jsonObject = new JSONObject(json);

@@ -286,7 +286,7 @@ public class BlockWorkFlow {
      * @param workflowOutputFile    File workflowOutputFile = File.createTempFile("job_"+getId(),".json",new File(WORKING_DIRECTORY));
      *                                  -- > File to put the Blocks JSONArray info with the output info, stdout, stderr, error info after the execution
      */
-    public JSONArray execute(JSONObject jObject, String outputFolder, String workflowOutputFile) throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException, InstantiationException, FieldMismatchException, InterruptedException {
+    public JSONArray execute(JSONObject jObject, String outputFolder, String workflowOutputFile) throws WrongTypeException, IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException, InstantiationException, FieldMismatchException, InterruptedException {
 
         JSONArray blocksArray = jObject.getJSONArray("blocks");
         JSONArray edgesArray  = jObject.getJSONArray("edges");
@@ -340,7 +340,7 @@ public class BlockWorkFlow {
      * initialize all the properties
      * set continuousFlag to decide whether this workFlow should be executed in a continuous way or cumulative way.
      */
-    public void mapIndexBlock(JSONArray blocksArray, String outputFolder, String workflowOutputFile) throws NoSuchMethodException, IllegalAccessException, InvocationTargetException, InstantiationException, FieldMismatchException {
+    public void mapIndexBlock(JSONArray blocksArray, String outputFolder, String workflowOutputFile) throws WrongTypeException, NoSuchMethodException, IllegalAccessException, InvocationTargetException, InstantiationException, FieldMismatchException {
         logger.info("initialize all the related ContinuousBlocks(including I/O/properties initialization) in this workFlow and set the idBlocksMap");
         Map<Integer, BlockObservation> idBlocksMap = new HashMap<>();
 
@@ -363,7 +363,12 @@ public class BlockWorkFlow {
                 if(annotation == null) continue;
                 Class<? extends Annotation> blockType = annotation.annotationType();
                 String blockTypeName = (String)blockType.getDeclaredMethod("type").invoke(annotation);
-                continuousFlag = (boolean)blockType.getDeclaredMethod("continuousFlag").invoke(annotation);
+
+                boolean flagTmp = (boolean)blockType.getDeclaredMethod("continuousFlag").invoke(annotation);
+                if(i != 0 && continuousFlag != flagTmp){
+                    throw new WrongTypeException();
+                }
+                continuousFlag = flagTmp;
 
                 if(blockTypeName.equals(blockTypeStr)){
                     currBlock = createBlockInstance(blockClass, module, blocksArray, workflowOutputFile);
