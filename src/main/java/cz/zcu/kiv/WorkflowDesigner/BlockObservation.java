@@ -495,7 +495,7 @@ public class BlockObservation extends Observable implements Observer, Runnable {
 
 
     /**
-     * updateJSON - Joey Pinto
+     * updateJSON - Joey Pinto, Yijie Huang
      * update the JSON file of "blocks"
      */
     public void updateJSON(boolean error, String stdErr, String stdOut) throws IOException {
@@ -532,10 +532,13 @@ public class BlockObservation extends Observable implements Observer, Runnable {
                 Table table=(Table)finalOutputObject;
                 JSONOutput.put("type", "TABLE");
                 JSONOutput.put("value", table.toJSON());
-                File file =File.createTempFile("temp_",".csv");
-                FileUtils.writeStringToFile(file,table.toCSV(), Charset.defaultCharset());
-                String destinationFileName = "table_" + new Date().getTime() + ".csv";
-                FileUtils.moveFile(file, new File(outputFolder + File.separator + destinationFileName));
+
+                String destinationFileName = "table_" + new Date().getTime() + "_";
+                File tmpFile = File.createTempFile(destinationFileName,".csv");
+                destinationFileName = tmpFile.getName();
+                File newFile = new File(outputFolder + File.separator + destinationFileName);
+                FileUtils.writeStringToFile(newFile, table.toCSV(), Charset.defaultCharset());
+
                 JSONObject fileObject=new JSONObject();
                 fileObject.put("title", destinationFileName);
                 fileObject.put("filename", destinationFileName);
@@ -547,10 +550,13 @@ public class BlockObservation extends Observable implements Observer, Runnable {
                 Graph graph=(Graph)finalOutputObject;
                 JSONOutput.put("type", "GRAPH");
                 JSONOutput.put("value", graph.toJSON());
-                File file =File.createTempFile("temp_",".json");
-                FileUtils.writeStringToFile(file, graph.toJSON().toString(4), Charset.defaultCharset());
-                String destinationFileName = "graph_"+ new Date().getTime() + ".json";
-                FileUtils.moveFile(file, new File(outputFolder + File.separator + destinationFileName));
+
+                String destinationFileName = "graph_" + new Date().getTime() + "_";
+                File tmpFile = File.createTempFile(destinationFileName,".json");
+                destinationFileName = tmpFile.getName();
+                File newFile = new File(outputFolder + File.separator + destinationFileName);
+                FileUtils.writeStringToFile(newFile, graph.toJSON().toString(4), Charset.defaultCharset());
+
                 JSONObject fileObject=new JSONObject();
                 fileObject.put("title", destinationFileName);
                 fileObject.put("filename", destinationFileName);
