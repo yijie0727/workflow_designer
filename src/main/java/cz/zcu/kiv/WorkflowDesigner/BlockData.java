@@ -31,6 +31,9 @@ import java.util.Map;
  **********************************************************************************************************************/
 
 public class BlockData implements Serializable {
+
+    private static final long serialVersionUID = 1L;
+
     Map<String, Object> input;
     Map<String, Object> output;
     Map<String, Object> properties;

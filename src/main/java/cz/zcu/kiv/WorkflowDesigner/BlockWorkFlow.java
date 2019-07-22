@@ -8,9 +8,14 @@ import org.json.JSONObject;
 import org.reflections.Reflections;
 
 import java.io.IOException;
+import java.io.PipedInputStream;
+import java.io.PipedOutputStream;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationTargetException;
 import java.util.*;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 /***********************************************************************************************************************
  *
@@ -34,7 +39,7 @@ import java.util.*;
  ***********************************************************************************************************************
  *
  * Workflow, 2018/17/05 6:32 Joey Pinto
- * BlockWorkFlow, 2019 GSoC P1 Yijie Huang
+ * BlockWorkFlow, 2019 GSoC P1 P2 Yijie Huang
  *
  * This file hosts the methods used to dynamically create the Javascript files needed for the workflow designer
  * Front end sends JSON to it to initialize block tree and execute workFlow.
@@ -60,6 +65,8 @@ public class BlockWorkFlow {
 
     private long jobID;//one workFlow one jobID
 
+
+    private boolean[] continuousFlag = new boolean[1];
 
     /**
      * Constructor for building BlockTrees for front-End  -- (Front-End call: initializeBlocks)
@@ -113,7 +120,11 @@ public class BlockWorkFlow {
         for(Class blockClass : blockClasses){
 
             BlockObservation currBlock = createBlockInstance(blockClass, module, null, null);
-            currBlock.initializeIO();
+            try{
+                currBlock.initializeIO(continuousFlag, 0, false);
+            } catch (WrongTypeException e){
+                //no need to deal with this WrongTypeException when initialize blocks
+            }
             blocksList.add(currBlock);
 
         }
@@ -134,6 +145,7 @@ public class BlockWorkFlow {
         String blockTypeFamily = (String)blockType.getDeclaredMethod("family").invoke(annotation);
         String description = (String)blockType.getDeclaredMethod("description").invoke(annotation);
         Boolean jarExecutable = (Boolean) blockType.getDeclaredMethod("runAsJar").invoke(annotation);
+        Boolean jarRMI = (Boolean) blockType.getDeclaredMethod("jarRMI").invoke(annotation);
 
         currBlock.setName(blockTypeName);
         currBlock.setFamily(blockTypeFamily);
@@ -141,12 +153,136 @@ public class BlockWorkFlow {
         currBlock.setDescription(description);
         currBlock.setJarExecutable(jarExecutable);
         currBlock.setJobID(jobID);
+        currBlock.setRmiFlag(jarRMI);
 
         return currBlock;
     }
 
+
     /**
-     * execute - Yijie Huang, Joey Pinto
+     * assignOutputWrites - Yijie Huang
+     * assign each source block's  Map<String, List<PipedOutputStream>> outTransitWriteMap,
+     * connect source block's output with all its next destination blocks' inputs
+     */
+    public void assignOutputWrites(JSONArray edgesArray){
+        logger.info("put entity into outputWriteMap for each source block");
+
+        for(int i = 0; i<edgesArray.length(); i++){
+            JSONObject edge = edgesArray.getJSONObject(i);
+
+            int block1ID = edge.getInt("block1");
+            BlockObservation block1 = indexBlocksMap.get(block1ID);
+            String sourceParam = edge.getJSONArray("connector1").getString(0);
+
+            int block2ID = edge.getInt("block2");
+            BlockObservation block2 = this.indexBlocksMap.get(block2ID);
+            String destinationParam = edge.getJSONArray("connector2").getString(0);
+
+            Map<String, List<PipedOutputStream>> outTransitWriteMap = block1.getOutTransitWriteMap();
+            Map<String, PipedOutputStream>   inTransitsMap = block2.getInTransitsMap();
+            if(!outTransitWriteMap.containsKey(sourceParam))
+                outTransitWriteMap.put(sourceParam, new ArrayList<PipedOutputStream>());
+
+            PipedOutputStream outTransit = inTransitsMap.get(destinationParam);
+            outTransitWriteMap.get(sourceParam).add(outTransit);
+        }
+
+    }
+
+    /**
+     * assignPipes - Yijie Huang
+     */
+    public int assignPipes( ) throws IllegalAccessException, IOException{
+        logger.info("assign PipedTransit for each block");
+
+        int inputsNum = 0;
+        for(int id: indexBlocksMap.keySet()){
+            BlockObservation block = indexBlocksMap.get(id);
+            block.assignPipeTransit();
+
+            if(block.getInputs()!= null)
+                inputsNum += block.getInputs().size();
+        }
+
+        return inputsNum;
+    }
+
+
+    /**
+     * executeContinuous - Yijie Huang
+     *
+     * @param jObject               SONObject contains Blocks and Edges info
+     *
+     *  if all the @BlockType's continuousFlag are true, then execute in a continuous stream way:
+     *   execute the whole workflow, using pipedInputStream and pipedOutputStream to connect all the blocks' @BlockInput and @BlockOutput
+     *  if all these flags are false:  execute the workFlow in a cumulative data way
+     */
+    public JSONArray executeContinuous(JSONObject jObject) throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException, InstantiationException, FieldMismatchException, InterruptedException {
+        logger.info("  Start Continuous WorkFlow Execution …………………… ");
+
+        JSONArray blocksArray = jObject.getJSONArray("blocks");
+        JSONArray edgesArray  = jObject.getJSONArray("edges");
+        errorFlag[0] = false;
+        //mapIndexBlock(blocksArray, outputFolder, workflowOutputFile);
+
+        int pipesInputsNum = assignPipes();
+
+        assignOutputWrites(edgesArray);
+
+
+        int poolSize  = blocksArray.length() + pipesInputsNum;
+        ThreadPoolExecutor threadPool = new ThreadPoolExecutor(poolSize, poolSize, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<Runnable>(poolSize), new ThreadPoolExecutor.AbortPolicy());
+
+
+        logger.info("……………………………………………………………………   Submit ContinuousBlockThread to threadPool:  ……………………………………………………………………");
+        for(int id: indexBlocksMap.keySet()){
+            BlockObservation currBlock = indexBlocksMap.get(id);
+            ContinuousBlockThread currTask = new ContinuousBlockThread(id, currBlock, errorFlag);
+            threadPool.execute(currTask);
+        }
+
+        logger.info("……………………………………………………………………   Submit PipeTransitThread to threadPool:  ………………………………………………………………………………");
+        for(int id: indexBlocksMap.keySet()){
+            BlockObservation block = indexBlocksMap.get(id);
+            if(block.getOutTransitReadMap()  == null) continue; // skip blocks without outputs(the las blocks in the workFlows)
+
+            Map<String, PipedInputStream>        outTransitReadMap  = block.getOutTransitReadMap();
+            Map<String, List<PipedOutputStream>> outTransitWriteMap = block.getOutTransitWriteMap();
+
+            for(String outputName: outTransitReadMap.keySet()){
+
+                PipedInputStream pipedInTransit = outTransitReadMap.get(outputName);
+                List<PipedOutputStream> pipedOutTransitsList = outTransitWriteMap.get(outputName);
+
+                threadPool.execute(  new PipeTransitThread(id, outputName,  pipedInTransit,  pipedOutTransitsList)  );
+
+            }
+        }
+
+        threadPool.shutdown();
+        boolean loop;
+        do {
+            loop = !threadPool.awaitTermination(2, TimeUnit.SECONDS);
+        } while(loop && !errorFlag[0]);
+
+        threadPool.shutdownNow();
+        logger.info("………………………………………………………………………………………  ShutDown threadPool  …………………………………………………………………………………………………………………… ");
+
+
+
+
+        if(!errorFlag[0])
+            logger.info( "Workflow Execution completed successfully!");
+        else
+            logger.error("Workflow Execution failed!");
+
+
+        return blocksArray;
+    }
+
+
+    /**
+     * executeCumulative - Yijie Huang, Joey Pinto
      *
      * This method receives front end workflow's JSON file and to execute the workFlow.
      * @param jObject               SONObject contains Blocks and Edges info
@@ -154,17 +290,20 @@ public class BlockWorkFlow {
      * @param workflowOutputFile    File workflowOutputFile = File.createTempFile("job_"+getId(),".json",new File(WORKING_DIRECTORY));
      *                                  -- > File to put the Blocks JSONArray info with the output info, stdout, stderr, error info after the execution
      */
-    public JSONArray execute(JSONObject jObject, String outputFolder, String workflowOutputFile) throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException, InstantiationException, FieldMismatchException, InterruptedException {
-        logger.info(" Start Continuous WorkFlow Execution …… ");
+    public JSONArray execute(JSONObject jObject, String outputFolder, String workflowOutputFile) throws WrongTypeException, IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException, InstantiationException, FieldMismatchException, InterruptedException {
 
         JSONArray blocksArray = jObject.getJSONArray("blocks");
         JSONArray edgesArray  = jObject.getJSONArray("edges");
 
-        count[0] = blocksArray.length();
-        errorFlag[0] = false;
-
         //initialize  and  set  map<ID,  BlockObservation> indexBlocksMap(config I/Os and assign properties)
         mapIndexBlock(blocksArray, outputFolder, workflowOutputFile);
+        if(continuousFlag[0])
+            return executeContinuous(jObject);
+
+        logger.info("  Start Cumulative WorkFlow Execution …………………… ");
+
+        count[0] = blocksArray.length();
+        errorFlag[0] = false;
 
         //initialize IO map and block start list for thread
         mapBlocksIO(edgesArray);
@@ -201,12 +340,15 @@ public class BlockWorkFlow {
      * mapBlockIndex - Yijie Huang, Joey Pinto
      *
      * map all the BlockObservations related in this workflow according to the front-end blocks JSONArray
-     * initialize Map<Integer,  BlockObservation> indexMap, and initialize all the properties
+     * initialize Map<Integer,  BlockObservation> indexMap
+     * initialize all the properties
+     * set continuousFlag to decide whether this workFlow should be executed in a continuous way or cumulative way.
      */
-    public void mapIndexBlock(JSONArray blocksArray, String outputFolder, String workflowOutputFile) throws NoSuchMethodException, IllegalAccessException, InvocationTargetException, InstantiationException, FieldMismatchException {
+    public void mapIndexBlock(JSONArray blocksArray, String outputFolder, String workflowOutputFile) throws WrongTypeException, NoSuchMethodException, IllegalAccessException, InvocationTargetException, InstantiationException, FieldMismatchException {
         logger.info("initialize all the related ContinuousBlocks(including I/O/properties initialization) in this workFlow and set the idBlocksMap");
         Map<Integer, BlockObservation> idBlocksMap = new HashMap<>();
 
+        continuousFlag[0] = false;
         for(int i = 0; i<blocksArray.length(); i++){
             BlockObservation currBlock = null;
 
@@ -228,6 +370,7 @@ public class BlockWorkFlow {
                 if(blockTypeName.equals(blockTypeStr)){
                     currBlock = createBlockInstance(blockClass, module, blocksArray, workflowOutputFile);
                     currBlock.setId(id);
+
                     break;
                 }
             }
@@ -237,7 +380,9 @@ public class BlockWorkFlow {
             }
 
             //Initialize the block I/O/properties and configurations
-            currBlock.initializeIO();
+
+            currBlock.initializeIO(continuousFlag, i, true);
+            System.out.println("jobId="+ jobID+ ", in workflow: mapBlockIndex: "+ currBlock.getId()+", "+currBlock.getName()+", continuousFlag[0]="+continuousFlag[0]);
             currBlock.assignProperties(blockObject);
             currBlock.setBlockObject(blockObject);
             currBlock.setOutputFolder(outputFolder);

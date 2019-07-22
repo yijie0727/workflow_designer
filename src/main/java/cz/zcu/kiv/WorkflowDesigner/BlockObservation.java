@@ -18,7 +18,13 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
+import java.net.MalformedURLException;
 import java.nio.charset.Charset;
+import java.rmi.Naming;
+import java.rmi.Remote;
+import java.rmi.RemoteException;
+import java.rmi.registry.LocateRegistry;
+import java.rmi.server.UnicastRemoteObject;
 import java.util.*;
 
 import static cz.zcu.kiv.WorkflowDesigner.Type.STREAM;
@@ -45,7 +51,7 @@ import static cz.zcu.kiv.WorkflowDesigner.Type.STREAM;
  ***********************************************************************************************************************
  *
  * Block, 2018/16/05 13:32 Joey Pinto
- * BlockObservation, 2019 GSoC P1 Yijie Huang
+ * BlockObservation, 2019 GSoC P1 P2 Yijie Huang
  *
  * In 2018, This file is the model for a single block in the workflow designer tool.
  * In 2019, it implements Observer Pattern design, making destination block execute
@@ -88,19 +94,24 @@ public class BlockObservation extends Observable implements Observer, Runnable {
     private final JSONArray blocksArray;
     private String workflowOutputFile;
 
+    //Fields for RMI
+    private boolean rmiFlag;
+    private BlockData blockData;
+    private IRemoteData remoteDataImpleServer;
+
+
+    //Fields for continuous stream model (no cumulative data in blocks) (pipe)
+    private PipedOutputStream[] pipedOuts;
+    private PipedInputStream[] pipedInsTransit;
+    private PipedOutputStream[] pipedOutsTransit;
+    private PipedInputStream[] pipedIns;
+    private Map<String, PipedOutputStream>   inTransitsMap;            //store Map<inputName(unique annotation name):  corresponding pipedOutsTransit     (connect this block's input's PipedInTransit)>
+    private Map<String, PipedInputStream>    outTransitReadMap;        //store Map<outputName(unique annotation name): corresponding pipedInsTransit      (connect this block's output's PipedInTransit)>
+    private Map<String, List<PipedOutputStream>> outTransitWriteMap;   //store Map<outputName(unique annotation name): corresponding pipedOutsTransitList (connect next blocks' input's PipeOutTransit)>
 
 
     //var for workFlow jobID: same workflow same jobID
     private long jobID;
-
-    public long getJobID() {
-        return jobID;
-    }
-
-    public void setJobID(long jobID) {
-        this.jobID = jobID;
-    }
-
 
 
     public BlockObservation(Object context, BlockWorkFlow blockWorkFlow, JSONArray blocksArray, String workflowOutputFile) {
@@ -109,6 +120,81 @@ public class BlockObservation extends Observable implements Observer, Runnable {
         this.blocksArray = blocksArray;
         this.workflowOutputFile = workflowOutputFile;
     }
+
+
+    /**
+     * assignPipeTransit - Yijie Huang
+     * assign the PipedOutputStream and PipedInputStream;
+     * and Map<String, PipedOutputStream>   inTransitsMap;
+     * Map<String, PipedInputStream>    outTransitReadMap
+     */
+    public void assignPipeTransit() throws IllegalAccessException, IOException {
+
+        int outNum = 0, inNum = 0;
+
+        if( outputs != null && outputs.size() != 0) {
+            outNum = outputs.size();
+            pipedOuts       = new PipedOutputStream[outNum];
+            pipedInsTransit = new PipedInputStream[outNum];
+        }
+
+        if( inputs != null  && inputs.size() != 0) {
+            inNum = inputs.size();
+            pipedOutsTransit = new PipedOutputStream[inNum];
+            pipedIns         = new PipedInputStream[inNum];
+        }
+
+        // connect original outputs pipedOutputStream and pipedInputTransits
+        if(outNum != 0){
+            outTransitReadMap  = new HashMap<>();
+            outTransitWriteMap = new HashMap<>();  //empty now, entity will be put in BlockWorkFlow.java
+
+            int i = 0;
+            Field[] outputFields = context.getClass().getDeclaredFields();
+            for (Field f : outputFields) {
+                f.setAccessible(true);
+
+                BlockOutput blockOutput = f.getAnnotation(BlockOutput.class);
+                if (blockOutput != null) {
+
+                    pipedOuts[i] = (PipedOutputStream) f.get(context);
+                    pipedInsTransit[i] = new PipedInputStream();
+                    pipedOuts[i].connect(pipedInsTransit[i]);
+
+                    outTransitReadMap.put(blockOutput.name(), pipedInsTransit[i]);
+
+                    i++;
+
+                }
+            }
+        }
+
+        // connect pipedOutputTransits and original inputs pipedInputStream
+        if(inNum != 0){
+            inTransitsMap = new HashMap<>();
+            int j = 0;
+            Field[] inputFields =  context.getClass().getDeclaredFields();
+            for (Field f : inputFields) {
+                f.setAccessible(true);
+
+                BlockInput blockInput = f.getAnnotation(BlockInput.class);
+                if (blockInput != null) {
+
+                    pipedOutsTransit[j] = new PipedOutputStream();
+                    pipedIns[j] = (PipedInputStream) f.get(context);
+                    pipedOutsTransit[j].connect(pipedIns[j]);
+
+                    inTransitsMap.put(blockInput.name(), pipedOutsTransit[j]);
+
+                    j++;
+
+                }
+            }
+        }
+
+
+    }
+
 
     /**
      * run - Yijie Huang
@@ -122,7 +208,7 @@ public class BlockObservation extends Observable implements Observer, Runnable {
         StringBuilder stdErr = new StringBuilder();
         StringBuilder stdOut = new StringBuilder();
         try{
-            this.connectIO();
+            this.connectIO();// connect IO and assign blockdata
             finalOutputObject = this.blockExecute(stdOut, stdErr);
 
         } catch (Exception e){
@@ -188,9 +274,7 @@ public class BlockObservation extends Observable implements Observer, Runnable {
 
         if(isJarExecutable() && blockWorkFlow.getJarDirectory()!=null && !stream){
             //Execute block as an external JAR file for normal data
-
-            BlockData blockData = this.connectIO();
-            output = executeAsJar(blockData, stdOut, stdErr);
+            output = executeAsJar(stdOut, stdErr);
         }
         else{
             try {
@@ -243,45 +327,98 @@ public class BlockObservation extends Observable implements Observer, Runnable {
     }
 
     /**
+     *  prepareRMI() - Yijie Huang
+     *  return Remote object
+     */
+    public Remote prepareRMI(int port) throws RemoteException, MalformedURLException {
+        Remote remoteObj = null;
+        // set this BlockData to the server remote Implementation class
+        // register communication port and path
+
+        remoteDataImpleServer = new RemoteDataImple();
+        String blockIdName = "["+id + " " + name +"] properties and inputs, in prepareRMI from rmiServer";
+        remoteDataImpleServer.setBlockData(blockData, blockIdName);
+
+        // use the rmi registry command to create and start a remote object registry on the specified port on the current host.
+        remoteObj = LocateRegistry.createRegistry(port);
+
+        String url = "rmi://localhost:" + port + "/IRemoteData";
+        Naming.rebind(url, remoteDataImpleServer); //  rebind the designated remote object
+        System.out.println("Server registers in port "+ port+",  block "+getId()+", "+getName());
+
+        return remoteObj;
+    }
+
+    /**
+     * generatePort()
+     * create unique port id used in rmi
+     */
+    private int generatePort(){
+        int port = (int)(jobID%1024)*10 + 1024 + id*100;
+        if(port == 8680)
+            return port + id*100;
+        return port;
+    }
+
+    /**
      * Execute block externally as a JAR - Joey Pinto
-     *
-     * @param blockData Serializable BlockData model representing all the data needed by a block to execute
+     * transfer data through RMI or FILE
      * @param stdOut Standard Output Stream
      * @param stdErr Standard Error Stream
      * @return output returned by BlockExecute Method
      * @throws Exception when output file is not created
      */
-    private Object executeAsJar(BlockData blockData, StringBuilder stdOut, StringBuilder stdErr) throws Exception {
-        logger.info("Executing id = "+ getId() +", name = "+getName()+" as a JAR."+", in jobID "+jobID);
+    private Object executeAsJar(StringBuilder stdOut, StringBuilder stdErr) throws Exception {
+        logger.info("Executing id = " + getId() + ", name = " + getName() + " as a JAR." + ", in jobID " + jobID);
 
-        Object output;
+        Object output = null;
+        String fileName = "jobID_" + jobID + "_bID_" + id + "_" + new Date().getTime() + "_";
+        Remote remoteObj = null;        //for RMI
+        File inputFile   = null;        //for FILE
+        File outputFile = null;         //for FILE
+
+        //get jarFile.getAbsolutePath()
+        File jarDirectory = new File(blockWorkFlow.getJarDirectory());
+        jarDirectory.mkdirs();
+        String jarFilePath = jarDirectory.getAbsolutePath() + File.separator + getModule().split(":")[0];
+        File jarFile = new File(jarFilePath);
+
+        //Calling jar file externally with entry point at the Block's main method
+        String defaultVmArgs = "-Xmx1G";
+        String vmargs = System.getProperty("workflow.designer.vm.args");
+        vmargs = vmargs != null ? vmargs : defaultVmArgs;
+        String[] args;
+        String blockIdName = id + " " + name;
+
         try {
-            String fileName = "jobID_"+jobID+ "_bID_"+id+"_"+new Date().getTime()+"_" ;
-            File inputFileTmp  = File.createTempFile(fileName, ".in",  new File(blockWorkFlow.getJarDirectory()));
-            File outputFileTmp = File.createTempFile(fileName, ".out", new File(blockWorkFlow.getJarDirectory()));
-            File inputFile  = new File(inputFileTmp.getAbsolutePath());
-            File outputFile = new File(outputFileTmp.getAbsolutePath());
+            // execute as jar and fetch blockData through RMI, otherwise through FILE
+            if (rmiFlag) {
 
-            //Serialize and write BlockData object to a file
-            FileOutputStream fos = new FileOutputStream(inputFile);
-            ObjectOutputStream oos = new ObjectOutputStream(fos);
-            oos.writeObject(blockData);
-            oos.close();
+                int port = generatePort();//set an unique port number
+                remoteObj = this.prepareRMI(port);
 
-            File jarDirectory = new File(blockWorkFlow.getJarDirectory());
-            jarDirectory.mkdirs();
-            String jarFilePath = jarDirectory.getAbsolutePath()+File.separator+getModule().split(":")[0];
-            File jarFile = new File(jarFilePath);
+                args = new String[]{"java", vmargs, "-cp", jarFile.getAbsolutePath(), "cz.zcu.kiv.WorkflowDesigner.BlockObservation", blockIdName,    String.valueOf(port),   getModule().split(":")[1],   "RMI"};
+            }
+            //if transfer data through FILE instead of RMI
+            else {
+                File inputFileTmp = File.createTempFile(fileName, ".in", new File(blockWorkFlow.getJarDirectory()));
+                File outputFileTmp = File.createTempFile(fileName, ".out", new File(blockWorkFlow.getJarDirectory()));
+                inputFile = new File(inputFileTmp.getAbsolutePath());
+                outputFile = new File(outputFileTmp.getAbsolutePath());
 
-            //Calling jar file externally with entry point at the Block's main method
-            String defaultVmArgs = "-Xmx1G";
-            String vmargs = System.getProperty("workflow.designer.vm.args");
-            vmargs = vmargs != null ? vmargs : defaultVmArgs;
-            String[]args=new String[]{"java", vmargs, "-cp",jarFile.getAbsolutePath() ,"cz.zcu.kiv.WorkflowDesigner.BlockObservation",inputFile.getAbsolutePath(),outputFile.getAbsolutePath(),getModule().split(":")[1]};
-            logger.info("Passing arguments" + Arrays.toString(args)+", in jobID "+jobID);
+                //Serialize and write BlockData object to a file
+                FileOutputStream fos = new FileOutputStream(inputFile);
+                ObjectOutputStream oos = new ObjectOutputStream(fos);
+                oos.writeObject(blockData);
+                oos.close();
+
+                args = new String[]{"java", vmargs, "-cp", jarFile.getAbsolutePath(), "cz.zcu.kiv.WorkflowDesigner.BlockObservation", inputFile.getAbsolutePath(), outputFile.getAbsolutePath(), getModule().split(":")[1], "FILE"};
+            }
+
+            logger.info("Passing arguments" + Arrays.toString(args) + ", in jobID " + jobID);
             ProcessBuilder pb = new ProcessBuilder(args);
             //Store output and error streams to files
-            logger.info("Executing jar file "+jarFilePath+", in jobID "+jobID);
+            logger.info("Executing jar file " + jarFilePath + ", in jobID " + jobID);
             File stdOutFile = new File("std_output.log");
             pb.redirectOutput(stdOutFile);
             File stdErrFile = new File("std_error.log");
@@ -289,57 +426,68 @@ public class BlockObservation extends Observable implements Observer, Runnable {
             Process ps = pb.start();
             ps.waitFor();
             stdOut.append(FileUtils.readFileToString(stdOutFile, Charset.defaultCharset()));
-            String processErr =FileUtils.readFileToString(stdErrFile,Charset.defaultCharset());
+            String processErr = FileUtils.readFileToString(stdErrFile, Charset.defaultCharset());
             stdErr.append(processErr);
-            InputStream is=ps.getErrorStream();
-            byte b[]=new byte[is.available()];
-            is.read(b,0,b.length);
+            InputStream is = ps.getErrorStream();
+            byte[] b = new byte[is.available()];
+            is.read(b, 0, b.length);
             String errorString = new String(b);
-            if(!errorString.isEmpty()){
-                logger.error(errorString+", in jobID "+jobID);
+            if (!errorString.isEmpty()) {
+                logger.error(errorString + ", in jobID " + jobID);
                 stdErr.append(errorString);
             }
-
-            is=ps.getInputStream();
-            b=new byte[is.available()];
-            is.read(b,0,b.length);
+            is = ps.getInputStream();
+            b = new byte[is.available()];
+            is.read(b, 0, b.length);
             String outputString = new String(b);
-            if(!outputString.isEmpty()){
-                logger.info(outputString+", in jobID "+jobID);
+            if (!outputString.isEmpty()) {
+                logger.info(outputString + ", in jobID " + jobID);
                 stdOut.append(outputString);
             }
 
-            FileUtils.deleteQuietly(inputFile);
 
-            if(outputFile.exists()){
-                FileInputStream fis = new FileInputStream(outputFile);
-                ObjectInputStream ois = new ObjectInputStream(fis);
-                blockData = (BlockData) ois.readObject();
-                ois.close();
-                output=blockData.getProcessOutput();
-                FileUtils.deleteQuietly(outputFile);
-                for (Field f: context.getClass().getDeclaredFields()) {
-                    f.setAccessible(true);
-                    BlockOutput blockOutput = f.getAnnotation(BlockOutput.class);
-                    if (blockOutput != null) {
-                        f.set(context,blockData.getOutput().get(blockOutput.name()));
-                    }
-                }
+            // execute as jar and fetch blockData through RMI, otherwise through FILE
+            if (rmiFlag) {
+                blockData = remoteDataImpleServer.getBlockData("["+blockIdName+"], for output, in executeAsJar from rmiServer");
+                output = blockData.getProcessOutput();
+
+                // release rmi port (send data)
+                UnicastRemoteObject.unexportObject(remoteObj,true);
             }
+            //if transfer data through FILE instead of RMI
             else{
-                String err = "Output file does not exist for block "+id+" "+name+", in jobID "+jobID;
-                if(processErr != null && !processErr.isEmpty()){
-                    err = processErr;
+                if (outputFile != null && outputFile.exists()) {
+                    FileInputStream fis = new FileInputStream(outputFile);
+                    ObjectInputStream ois = new ObjectInputStream(fis);
+                    blockData = (BlockData) ois.readObject();
+                    ois.close();
+                    output = blockData.getProcessOutput();
+                    FileUtils.deleteQuietly(outputFile);
+                } else {
+                    String err = "Output file does not exist for block " + id + " " + name + ", in jobID " + jobID +". ";
+                    if (processErr != null && !processErr.isEmpty()) {
+                        err += processErr;
+                    }
+                    throw new Exception(err);
                 }
-                throw new Exception(err);
             }
+
+            for (Field f : context.getClass().getDeclaredFields()) {
+                f.setAccessible(true);
+                BlockOutput blockOutput = f.getAnnotation(BlockOutput.class);
+                if (blockOutput != null) {
+                    f.set(context, blockData.getOutput().get(blockOutput.name()));
+                }
+            }
+
         }
         catch (Exception e) {
             e.printStackTrace();
             stdErr.append(org.apache.commons.lang3.exception.ExceptionUtils.getStackTrace(e));
-            logger.error("Error executing Jar file for block "+id+" "+name +", in jobID "+jobID, e);
+            logger.error("Error executing Jar file for block " + id + " " + name + ", in jobID " + jobID, e);
             throw e;
         }
+
         return output;
     }
 
@@ -347,78 +495,85 @@ public class BlockObservation extends Observable implements Observer, Runnable {
 
 
     /**
-     * updateJSON - Joey Pinto
+     * updateJSON - Joey Pinto, Yijie Huang
      * update the JSON file of "blocks"
      */
     public void updateJSON(boolean error, String stdErr, String stdOut) throws IOException {
-        logger.info("Update JSON for blocl "+getId()+", name = "+getName() +", in jobID "+jobID);
-
-        blockObject.put("error", error);
-        blockObject.put("stderr", stdErr);
-        blockObject.put("stdout", stdOut);
-        blockObject.put("completed", true);
-
-        JSONObject JSONOutput = new JSONObject();
-        if(finalOutputObject==null){
-            JSONOutput = null;
-        }  else if (finalOutputObject.getClass().equals(String.class)){
-
-            JSONOutput.put("type","STRING");
-            JSONOutput.put("value",finalOutputObject);
-
-        }  else if (finalOutputObject.getClass().equals(File.class)){
-
-            File file = (File) finalOutputObject;
-            String destinationFileName="file_"+new Date().getTime()+"_"+file.getName();
-            FileUtils.moveFile(file, new File(outputFolder + File.separator + destinationFileName));
-            JSONOutput.put("type", "FILE");
-            JSONObject fileObject = new JSONObject();
-            fileObject.put("title", file.getName());
-            fileObject.put("filename", destinationFileName);
-            JSONOutput.put("value", fileObject);
-
-        }else if (finalOutputObject.getClass().equals(Table.class)){
-
-            Table table=(Table)finalOutputObject;
-            JSONOutput.put("type", "TABLE");
-            JSONOutput.put("value", table.toJSON());
-            File file =File.createTempFile("temp_",".csv");
-            FileUtils.writeStringToFile(file,table.toCSV(), Charset.defaultCharset());
-            String destinationFileName = "table_" + new Date().getTime() + ".csv";
-            FileUtils.moveFile(file, new File(outputFolder + File.separator + destinationFileName));
-            JSONObject fileObject=new JSONObject();
-            fileObject.put("title", destinationFileName);
-            fileObject.put("filename", destinationFileName);
-            JSONOutput.put("value", fileObject);
-
-        }
-        else if (finalOutputObject.getClass().equals(Graph.class)){
-
-            Graph graph=(Graph)finalOutputObject;
-            JSONOutput.put("type", "GRAPH");
-            JSONOutput.put("value", graph.toJSON());
-            File file =File.createTempFile("temp_",".json");
-            FileUtils.writeStringToFile(file, graph.toJSON().toString(4), Charset.defaultCharset());
-            String destinationFileName = "graph_"+ new Date().getTime() + ".json";
-            FileUtils.moveFile(file, new File(outputFolder + File.separator + destinationFileName));
-            JSONObject fileObject=new JSONObject();
-            fileObject.put("title", destinationFileName);
-            fileObject.put("filename", destinationFileName);
-            JSONOutput.put("value", fileObject);
-
-        }
-        else{
-            JSONOutput.put("type","");
-            JSONOutput.put("value",finalOutputObject.toString());
-        }
-
-        if (JSONOutput != null)
-            blockObject.put("output", JSONOutput);
-
-
         synchronized (blocksArray){
+
+            logger.info("Update JSON for block "+getId()+", name = "+getName() +", in jobID "+jobID);
+
+            blockObject.put("error", error);
+            blockObject.put("stderr", stdErr);
+            blockObject.put("stdout", stdOut);
+            blockObject.put("completed", true);
+
+            JSONObject JSONOutput = new JSONObject();
+            if(finalOutputObject==null){
+                JSONOutput = null;
+            }  else if (finalOutputObject.getClass().equals(String.class)){
+
+                JSONOutput.put("type","STRING");
+                JSONOutput.put("value",finalOutputObject);
+
+            }  else if (finalOutputObject.getClass().equals(File.class)){
+
+                File file = (File) finalOutputObject;
+                String destinationFileName="file_"+new Date().getTime()+"_"+file.getName();
+                FileUtils.moveFile(file, new File(outputFolder + File.separator + destinationFileName));
+                JSONOutput.put("type", "FILE");
+                JSONObject fileObject = new JSONObject();
+                fileObject.put("title", file.getName());
+                fileObject.put("filename", destinationFileName);
+                JSONOutput.put("value", fileObject);
+
+            }else if (finalOutputObject.getClass().equals(Table.class)){
+
+                Table table=(Table)finalOutputObject;
+                JSONOutput.put("type", "TABLE");
+                JSONOutput.put("value", table.toJSON());
+
+                String destinationFileName = "table_" + new Date().getTime() + "_";
+                File tmpFile = File.createTempFile(destinationFileName,".csv");
+                destinationFileName = tmpFile.getName();
+                File newFile = new File(outputFolder + File.separator + destinationFileName);
+                FileUtils.writeStringToFile(newFile, table.toCSV(), Charset.defaultCharset());
+
+                JSONObject fileObject=new JSONObject();
+                fileObject.put("title", destinationFileName);
+                fileObject.put("filename", destinationFileName);
+                JSONOutput.put("value", fileObject);
+
+            }
+            else if (finalOutputObject.getClass().equals(Graph.class)){
+
+                Graph graph=(Graph)finalOutputObject;
+                JSONOutput.put("type", "GRAPH");
+                JSONOutput.put("value", graph.toJSON());
+
+                String destinationFileName = "graph_" + new Date().getTime() + "_";
+                File tmpFile = File.createTempFile(destinationFileName,".json");
+                destinationFileName = tmpFile.getName();
+                File newFile = new File(outputFolder + File.separator + destinationFileName);
+                FileUtils.writeStringToFile(newFile, graph.toJSON().toString(4), Charset.defaultCharset());
+
+                JSONObject fileObject=new JSONObject();
+                fileObject.put("title", destinationFileName);
+                fileObject.put("filename", destinationFileName);
+                JSONOutput.put("value", fileObject);
+
+            }
+            else{
+                JSONOutput.put("type","");
+                JSONOutput.put("value",finalOutputObject.toString());
+            }
+
+            if (JSONOutput != null)
+                blockObject.put("output", JSONOutput);
+
+
             //Save Present JSON (with outputs, errors) to the original file
-            logger.info("Update blocksArray JSON in workflowOutputFile for block id = "+ getId() +", name = "+ getName()+", in jobID "+jobID);
+            logger.info("-Update blocksArray JSON in workflowOutputFile for block id = "+ getId() +", name = "+ getName()+", in jobID "+jobID);
             if(workflowOutputFile!=null){
                 File workflowOutput = new File(workflowOutputFile);
                 FileUtils.writeStringToFile(workflowOutput, blocksArray.toString(4), Charset.defaultCharset());
@@ -431,32 +586,28 @@ public class BlockObservation extends Observable implements Observer, Runnable {
 
     /**
      * connectIO() - Joey Pinto, Yijie Huang
-     * connect the Input of this Block with all its SourceOutput of sourceBlocks
+     * connect the Input of this Block with all its SourceOutput of sourceBlocks and assign the variable blockdata used for serialize
      * by setting the value of the Input using reflection
      *
      */
-    public BlockData connectIO() throws IllegalAccessException {
+    public void connectIO() throws IllegalAccessException {
         logger.info(" Connect all the Inputs of BlockObservation[ ID = "+this.id+", " +this.name+" ] with its SourceOutputs."+", in jobID "+jobID);
-        BlockData blockData = new BlockData(getName());//for normal data
+        blockData = new BlockData(getName());//for normal data
 
-        if(!stream){
-            //Assign properties specific to blockData serialized object
-            for (Field f: context.getClass().getDeclaredFields()) {
-                f.setAccessible(true);
 
-                BlockProperty blockProperty = f.getAnnotation(BlockProperty.class);
-                if (blockProperty != null) {
-                    if(blockProperty.type().equals(Type.FILE)){
-                        blockData.getProperties().put(blockProperty.name(), new File(blockWorkFlow.getRemoteDirectory()+File.separator+f.get(context)));
-                    }
-                    else blockData.getProperties().put(blockProperty.name(), f.get(context));
-                }
+        //Assign properties specific to blockData serialized object
+        for (Field f: context.getClass().getDeclaredFields()) {
+            f.setAccessible(true);
+
+            BlockProperty blockProperty = f.getAnnotation(BlockProperty.class);
+            if (blockProperty != null) {
+                blockData.getProperties().put(blockProperty.name(), f.get(context));
             }
         }
 
-        if(inputs == null || inputs.isEmpty()) return blockData;
+        if(inputs == null || inputs.isEmpty()) return;
 
-        Map<Integer, BlockObservation> indexBlocksMap = blockWorkFlow.getIndexBlocksMap();
+        //Map<Integer, BlockObservation> indexBlocksMap = blockWorkFlow.getIndexBlocksMap();
         for(String destinationParam : IOMap.keySet()){
 
             //get SourceBlocks if it is list[]
@@ -513,17 +664,19 @@ public class BlockObservation extends Observable implements Observer, Runnable {
             }
         }
 
-        return blockData;
     }
 
 
 
 
     /**
-     * initializeIO() - Joey Pinto
+     * initializeIO() - Joey Pinto, Yijie Huang
      * Initialize a Block from a class
+     * judge the workFlow is continuous model or cumulative model
      */
-    public void initializeIO(){
+    public void initializeIO(boolean[] continuousFlag, int num,  boolean workFlowFlag) throws WrongTypeException{
+
+        boolean tmpFlag = false;
 
         if(getProperties()==null)
             setProperties(new HashMap<String,Property>());
@@ -540,13 +693,20 @@ public class BlockObservation extends Observable implements Observer, Runnable {
             BlockProperty blockProperty = f.getAnnotation(BlockProperty.class);
             if (blockProperty != null){
                 properties.put(blockProperty.name(),new Property(blockProperty.name(),blockProperty.type(),blockProperty.defaultValue(), blockProperty.description()));
+                continue;
             }
 
             BlockInput blockInput = f.getAnnotation(BlockInput.class);
             if (blockInput != null){
 
+                //if this block wants to deal with the stream data in a cumulative way through connect same type IO(InputStream to InputStream)
                 if(!blockInput.type().equals(STREAM)){
                     this.setStream(false);
+                }
+
+                //if this block wants to deal with the stream data in a continuous way through pipe In and Out transfer(PipedOutPutStream To PipedInputStream)
+                if( workFlowFlag && ("PipedOutputStream".equals(f.getType().getSimpleName()) || "PipedInputStream".equals(f.getType().getSimpleName())) ){
+                    tmpFlag = true;
                 }
 
                 String cardinality="";
@@ -561,15 +721,33 @@ public class BlockObservation extends Observable implements Observer, Runnable {
 
             BlockOutput blockOutput = f.getAnnotation(BlockOutput.class);
             if (blockOutput != null){
+
+                if(!blockOutput.type().equals(STREAM)){
+                    this.setStream(false);
+                }
+
+                if( workFlowFlag && ("PipedOutputStream".equals(f.getType().getSimpleName()) || "PipedInputStream".equals(f.getType().getSimpleName())) ){
+                    tmpFlag = true;
+                }
+
                 String cardinality="";
-                if(blockOutput.type().equals(STREAM)){
-                    cardinality=WorkflowCardinality.ONE_TO_ONE;
-                }
-                else{
-                    cardinality=WorkflowCardinality.MANY_TO_MANY;
-                }
+                cardinality=WorkflowCardinality.MANY_TO_MANY;
+
                 outputs.put(blockOutput.name(),new Data(blockOutput.name(),blockOutput.type(),cardinality));
             }
+
+            if(!workFlowFlag ) continue;
+
+            if(num == 0){
+                continuousFlag[0] = tmpFlag;
+
+            } else {
+
+                if(continuousFlag[0] != tmpFlag){
+                    throw new WrongTypeException();
+                }
+            }
+
         }
 
         logger.info("Initialized I/O/properties of BlockID "+getId()+", name "+getName()+" block from annotations"+", in jobID "+jobID);
@@ -720,40 +898,57 @@ public class BlockObservation extends Observable implements Observer, Runnable {
 
 
     /**
-     * main - Joey Pinto
+     * main - Joey Pinto, Yijie Huang
+     *
+     * Transfer blockData through RMI or FILE
      * Externally access main function, modification of parameters will affect reflective access
-     * @param args 1) serialized input file 2) serialized output file 3) Package Name
+     *  args 0) blockIdName string      1) RMI port                 2) Package Name     3) "RMI"
+     *  args 0) serialized input file   1) serialized output file   2) Package Name     3) "FILE"
      */
     public static void main(String[] args) {
         try {
-            //Reading BlockData object from file
-            BlockData blockData = SerializationUtils.deserialize(FileUtils.readFileToByteArray(new File(args[0])));
+            //blockIdName,                   String.valueOf(port),          getModule().split(":")[1],    "RMI"
+            //      0                               1                               2                       3
+            //inputFile.getAbsolutePath(),  outputFile.getAbsolutePath(),   getModule().split(":")[1],    "FILE"
 
+            String rmiOrFile = args[3];
+            BlockData blockData = null;
+            IRemoteData iRemoteDataClient = null;
+
+            if ("RMI".equals(rmiOrFile)) {
+                // set RMI url
+                int port = Integer.parseInt(args[1]);
+                String url = "rmi://localhost:" + port + "/IRemoteData";
+                iRemoteDataClient = (IRemoteData) Naming.lookup(url);
+                blockData = iRemoteDataClient.getBlockData("["+args[0] + "], for properties and inputs, in main from rmiClient");
+            }
+            else if ("FILE".equals(rmiOrFile)) {
+                //Reading BlockData object from file
+                blockData = SerializationUtils.deserialize(FileUtils.readFileToByteArray(new File(args[0])));
+            }
+
+            //find block class
             Set<Class<?>> blockTypes = new Reflections(args[2]).getTypesAnnotatedWith(BlockType.class);
-
             Class type = null;
-
             for (Class blockType : blockTypes) {
                 Annotation annotation = blockType.getAnnotation(BlockType.class);
                 Class<? extends Annotation>  currentType = annotation.annotationType();
 
                 String blockTypeName = (String) currentType.getDeclaredMethod("type").invoke(annotation, (Object[]) null);
-                if (blockData.getName().equals(blockTypeName)) {
+                if (blockData != null && blockData.getName().equals(blockTypeName)) {
                     type=blockType;
                     break;
                 }
             }
-
             Object obj;
             if(type!=null){
                 obj=type.newInstance();
-            }
-            else{
+            } else{
                 logger.error("No classes with Workflow Designer BlockType Annotations were found!");
                 throw new Exception("Error Finding Annotated Class");
             }
 
-
+            //fetch block properties and inputs
             for(Field field:type.getDeclaredFields()){
                 field.setAccessible(true);
                 if(field.getAnnotation(BlockInput.class)!=null){
@@ -764,9 +959,8 @@ public class BlockObservation extends Observable implements Observer, Runnable {
                 }
             }
 
-
+            //get block execute method and execute
             Method executeMethod = null;
-
             for(Method m:type.getDeclaredMethods()){
                 m.setAccessible(true);
                 if(m.getAnnotation(BlockExecute.class)!=null){
@@ -774,30 +968,34 @@ public class BlockObservation extends Observable implements Observer, Runnable {
                     break;
                 }
             }
-
             if(executeMethod!=null){
                 Object outputObj=executeMethod.invoke(obj);
                 blockData.setProcessOutput(outputObj);
-            }
-            else{
+            } else{
                 logger.error("No method annotated with Workflow Designer BlockExecute was found");
                 throw new Exception("Error finding Execute Method");
             }
 
+            //assign block execution return output and outputs
             blockData.setOutput(new HashMap<String, Object>());
-
             for(Field field:type.getDeclaredFields()){
                 field.setAccessible(true);
                 if(field.getAnnotation(BlockOutput.class)!=null){
                     blockData.getOutput().put(field.getAnnotation(BlockOutput.class).name(),field.get(obj));
                 }
-
             }
 
-            //Write output object to file
-            FileOutputStream fos = FileUtils.openOutputStream(new File(args[1]));
-            SerializationUtils.serialize(blockData,fos);
-            fos.close();
+            if("RMI".equals(rmiOrFile)) {
+                //set output object to remote blockData
+                iRemoteDataClient.setBlockData(blockData,  "["+args[0] +"] outputs, in main from rmiClient");
+            }
+            else if ("FILE".equals(rmiOrFile)) {//?
+                //Write output object to file
+                FileOutputStream fos = FileUtils.openOutputStream(new File(args[1]));
+                SerializationUtils.serialize(blockData,fos);
+                fos.close();
+            }
+
         }
         catch (Exception e) {
             //We need to write error to System.err to
@@ -809,6 +1007,8 @@ public class BlockObservation extends Observable implements Observer, Runnable {
             else
                 e.printStackTrace();
         }
+
+
     }
 
 
@@ -988,5 +1188,45 @@ public class BlockObservation extends Observable implements Observer, Runnable {
 
     public void setCount(int[] count) {
         this.count = count;
+    }
+
+    public long getJobID() {
+        return jobID;
+    }
+
+    public void setJobID(long jobID) {
+        this.jobID = jobID;
+    }
+
+    public boolean isRmiFlag() {
+        return rmiFlag;
+    }
+
+    public void setRmiFlag(boolean rmiFlag) {
+        this.rmiFlag = rmiFlag;
+    }
+
+    public Map<String, PipedOutputStream> getInTransitsMap() {
+        return inTransitsMap;
+    }
+
+    public void setInTransitsMap(Map<String, PipedOutputStream> inTransitsMap) {
+        this.inTransitsMap = inTransitsMap;
+    }
+
+    public Map<String, PipedInputStream> getOutTransitReadMap() {
+        return outTransitReadMap;
+    }
+
+    public void setOutTransitReadMap(Map<String, PipedInputStream> outTransitReadMap) {
+        this.outTransitReadMap = outTransitReadMap;
+    }
+
+    public Map<String, List<PipedOutputStream>> getOutTransitWriteMap() {
+        return outTransitWriteMap;
+    }
+
+    public void setOutTransitWriteMap(Map<String, List<PipedOutputStream>> outTransitWriteMap) {
+        this.outTransitWriteMap = outTransitWriteMap;
     }
 }
