@@ -51,7 +51,7 @@ public class WorkflowDesignerTest {
     @Test
     public void testBlock() throws NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException {
         JSONArray blocksArray=new BlockWorkFlow(ClassLoader.getSystemClassLoader(),":test",null,"").initializeBlocks();
-        assert blocksArray.length()==11;
+        assert blocksArray.length()==9;
     }
 
     @Test
@@ -105,7 +105,7 @@ public class WorkflowDesignerTest {
 
 
     @Test
-    public void testContinuous1() throws WrongTypeException, IOException, NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException, FieldMismatchException, InterruptedException{
+    public void testContinuous() throws WrongTypeException, IOException, NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException, FieldMismatchException, InterruptedException{
         String json = FileUtils.readFileToString(new File("test_data/pipedStreamTest.json"), Charset.defaultCharset());
 
         JSONObject jsonObject = new JSONObject(json);
@@ -125,33 +125,10 @@ public class WorkflowDesignerTest {
         JSONArray jsonArray = new BlockWorkFlow(ClassLoader.getSystemClassLoader(), moduleSource, null,"test_data",3).
                 execute(  jsonObject,  "test_data",  outputFile.getAbsolutePath());
         assert jsonArray !=null;
-        assert jsonArray.length() == 4;
+        assert jsonArray.length() == 6;
     }
 
 
-    @Test
-    public void testContinuous2() throws WrongTypeException,  IOException, NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException, FieldMismatchException, InterruptedException{
-        String json = FileUtils.readFileToString(new File("test_data/pipeTest2.json"), Charset.defaultCharset());
-
-        JSONObject jsonObject = new JSONObject(json);
-        File outputFile = File.createTempFile("testBlockPipeStream",".json");
-        outputFile.deleteOnExit();
-
-        JSONArray blocksArray = jsonObject.getJSONArray("blocks");
-        List<String> blockTypes = new ArrayList<>();
-        for (int i = 0; i < blocksArray.length(); i++) {
-            JSONObject blockObject = blocksArray.getJSONObject(i);
-            blockTypes.add(blockObject.getString("type"));
-        }
-        Map<Class, String> moduleSource = new HashMap<>();
-        Pack.assignModuleSource(moduleSource, blockTypes);
-
-
-        JSONArray jsonArray = new BlockWorkFlow(ClassLoader.getSystemClassLoader(), moduleSource, null,"test_data",4).
-                execute(  jsonObject,  "test_data",  outputFile.getAbsolutePath());
-        assert jsonArray !=null;
-        assert jsonArray.length() == 2;
-    }
 
 
     //@Test
