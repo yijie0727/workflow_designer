@@ -11,7 +11,7 @@ import java.io.PipedOutputStream;
 import static cz.zcu.kiv.WorkflowDesigner.Type.STREAM;
 import static cz.zcu.kiv.WorkflowDesigner.Type.STRING;
 
-@BlockType(type ="MixedPets", family = "PIPE", continuousFlag = true)
+@BlockType(type ="MixedPets", family = "PIPE")
 public class MixedPets {
 
     @BlockProperty(name = "petsNames", type = STRING, description = "Enter all the pets name, separate input pets Name with ',' (example: apple, meow, melody, marine, kiwi, bigPie, lucky)")

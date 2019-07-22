@@ -595,10 +595,7 @@ public class BlockObservation extends Observable implements Observer, Runnable {
 
             BlockProperty blockProperty = f.getAnnotation(BlockProperty.class);
             if (blockProperty != null) {
-                if(blockProperty.type().equals(Type.FILE)){
-                    blockData.getProperties().put(blockProperty.name(), new File(blockWorkFlow.getRemoteDirectory()+File.separator+f.get(context)));
-                }
-                else blockData.getProperties().put(blockProperty.name(), f.get(context));
+                blockData.getProperties().put(blockProperty.name(), f.get(context));
             }
         }
 
@@ -667,10 +664,13 @@ public class BlockObservation extends Observable implements Observer, Runnable {
 
 
     /**
-     * initializeIO() - Joey Pinto
+     * initializeIO() - Joey Pinto, Yijie Huang
      * Initialize a Block from a class
+     * judge the workFlow is continuous model or cumulative model
      */
-    public void initializeIO(){
+    public void initializeIO(boolean[] continuousFlag, int num,  boolean workFlowFlag) throws WrongTypeException{
+
+        boolean tmpFlag = false;
 
         if(getProperties()==null)
             setProperties(new HashMap<String,Property>());
@@ -687,13 +687,20 @@ public class BlockObservation extends Observable implements Observer, Runnable {
             BlockProperty blockProperty = f.getAnnotation(BlockProperty.class);
             if (blockProperty != null){
                 properties.put(blockProperty.name(),new Property(blockProperty.name(),blockProperty.type(),blockProperty.defaultValue(), blockProperty.description()));
+                continue;
             }
 
             BlockInput blockInput = f.getAnnotation(BlockInput.class);
             if (blockInput != null){
 
+                //if this block wants to deal with the stream data in a cumulative way through connect same type IO(InputStream to InputStream)
                 if(!blockInput.type().equals(STREAM)){
                     this.setStream(false);
+                }
+
+                //if this block wants to deal with the stream data in a continuous way through pipe In and Out transfer(PipedOutPutStream To PipedInputStream)
+                if( workFlowFlag && ("PipedOutputStream".equals(f.getType().getSimpleName()) || "PipedInputStream".equals(f.getType().getSimpleName())) ){
+                    tmpFlag = true;
                 }
 
                 String cardinality="";
@@ -708,11 +715,33 @@ public class BlockObservation extends Observable implements Observer, Runnable {
 
             BlockOutput blockOutput = f.getAnnotation(BlockOutput.class);
             if (blockOutput != null){
+
+                if(!blockOutput.type().equals(STREAM)){
+                    this.setStream(false);
+                }
+
+                if( workFlowFlag && ("PipedOutputStream".equals(f.getType().getSimpleName()) || "PipedInputStream".equals(f.getType().getSimpleName())) ){
+                    tmpFlag = true;
+                }
+
                 String cardinality="";
                 cardinality=WorkflowCardinality.MANY_TO_MANY;
 
                 outputs.put(blockOutput.name(),new Data(blockOutput.name(),blockOutput.type(),cardinality));
             }
+
+            if(!workFlowFlag ) continue;
+
+            if(num == 0){
+                continuousFlag[0] = tmpFlag;
+
+            } else {
+
+                if(continuousFlag[0] != tmpFlag){
+                    throw new WrongTypeException();
+                }
+            }
+
         }
 
         logger.info("Initialized I/O/properties of BlockID "+getId()+", name "+getName()+" block from annotations"+", in jobID "+jobID);

@@ -10,7 +10,7 @@ import java.io.PipedOutputStream;
 import static cz.zcu.kiv.WorkflowDesigner.Type.STREAM;
 import static cz.zcu.kiv.WorkflowDesigner.Type.STRING;
 
-@BlockType(type ="PetFilter", family = "PIPE", continuousFlag = true)
+@BlockType(type ="PetFilter", family = "PIPE")
 public class PetFilter {
 
 

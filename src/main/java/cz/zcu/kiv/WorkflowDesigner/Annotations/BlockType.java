@@ -15,6 +15,4 @@ public @interface BlockType {
 
     boolean jarRMI() default false;
 
-    boolean continuousFlag() default false;
-
 }

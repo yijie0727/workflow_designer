@@ -13,7 +13,7 @@ import java.util.List;
 
 import static cz.zcu.kiv.WorkflowDesigner.Type.STREAM;
 
-@BlockType(type ="TargetPet", family = "PIPE", continuousFlag = true)
+@BlockType(type ="TargetPet", family = "PIPE")
 public class PetTarget {
 
     @BlockInput(name = "TargetPets", type = STREAM)

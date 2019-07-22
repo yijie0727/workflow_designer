@@ -66,7 +66,7 @@ public class BlockWorkFlow {
     private long jobID;//one workFlow one jobID
 
 
-    private boolean continuousFlag;
+    private boolean[] continuousFlag = new boolean[1];
 
     /**
      * Constructor for building BlockTrees for front-End  -- (Front-End call: initializeBlocks)
@@ -120,7 +120,11 @@ public class BlockWorkFlow {
         for(Class blockClass : blockClasses){
 
             BlockObservation currBlock = createBlockInstance(blockClass, module, null, null);
-            currBlock.initializeIO();
+            try{
+                currBlock.initializeIO(continuousFlag, 0, false);
+            } catch (WrongTypeException e){
+                //no need to deal with this WrongTypeException when initialize blocks
+            }
             blocksList.add(currBlock);
 
         }
@@ -293,7 +297,7 @@ public class BlockWorkFlow {
 
         //initialize  and  set  map<ID,  BlockObservation> indexBlocksMap(config I/Os and assign properties)
         mapIndexBlock(blocksArray, outputFolder, workflowOutputFile);
-        if(continuousFlag)
+        if(continuousFlag[0])
             return executeContinuous(jObject);
 
         logger.info("  Start Cumulative WorkFlow Execution …………………… ");
@@ -344,8 +348,7 @@ public class BlockWorkFlow {
         logger.info("initialize all the related ContinuousBlocks(including I/O/properties initialization) in this workFlow and set the idBlocksMap");
         Map<Integer, BlockObservation> idBlocksMap = new HashMap<>();
 
-
-
+        continuousFlag[0] = false;
         for(int i = 0; i<blocksArray.length(); i++){
             BlockObservation currBlock = null;
 
@@ -368,12 +371,6 @@ public class BlockWorkFlow {
                     currBlock = createBlockInstance(blockClass, module, blocksArray, workflowOutputFile);
                     currBlock.setId(id);
 
-                    boolean flagTmp = (boolean)blockType.getDeclaredMethod("continuousFlag").invoke(annotation);
-                    if(i != 0 && continuousFlag != flagTmp){
-                        throw new WrongTypeException();
-                    }
-                    continuousFlag = flagTmp;
-
                     break;
                 }
             }
@@ -383,7 +380,9 @@ public class BlockWorkFlow {
             }
 
             //Initialize the block I/O/properties and configurations
-            currBlock.initializeIO();
+
+            currBlock.initializeIO(continuousFlag, i, true);
+            System.out.println("jobId="+ jobID+ ", in workflow: mapBlockIndex: "+ currBlock.getId()+", "+currBlock.getName()+", continuousFlag[0]="+continuousFlag[0]);
             currBlock.assignProperties(blockObject);
             currBlock.setBlockObject(blockObject);
             currBlock.setOutputFolder(outputFolder);
