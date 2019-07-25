@@ -68,6 +68,8 @@ public class BlockWorkFlow {
 
     private boolean[] continuousFlag = new boolean[1];
 
+    private List<String> generatedFilesList; //store all the generated file names of this job
+
     /**
      * Constructor for building BlockTrees for front-End  -- (Front-End call: initializeBlocks)
      */
@@ -285,15 +287,18 @@ public class BlockWorkFlow {
      * executeCumulative - Yijie Huang, Joey Pinto
      *
      * This method receives front end workflow's JSON file and to execute the workFlow.
-     * @param jObject               SONObject contains Blocks and Edges info
+     * @param jObject               JSONObject contains Blocks and Edges info
      * @param outputFolder          Folder to save the output File
      * @param workflowOutputFile    File workflowOutputFile = File.createTempFile("job_"+getId(),".json",new File(WORKING_DIRECTORY));
      *                                  -- > File to put the Blocks JSONArray info with the output info, stdout, stderr, error info after the execution
+     * @param generatedFilesList    all the files'name that the this workflow generated
      */
-    public JSONArray execute(JSONObject jObject, String outputFolder, String workflowOutputFile) throws WrongTypeException, IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException, InstantiationException, FieldMismatchException, InterruptedException {
+    public JSONArray execute(JSONObject jObject, String outputFolder, String workflowOutputFile, List<String> generatedFilesList) throws WrongTypeException, IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException, InstantiationException, FieldMismatchException, InterruptedException {
 
         JSONArray blocksArray = jObject.getJSONArray("blocks");
         JSONArray edgesArray  = jObject.getJSONArray("edges");
+
+        this.generatedFilesList = generatedFilesList;
 
         //initialize  and  set  map<ID,  BlockObservation> indexBlocksMap(config I/Os and assign properties)
         mapIndexBlock(blocksArray, outputFolder, workflowOutputFile);
@@ -526,5 +531,10 @@ public class BlockWorkFlow {
     public void setStartBlocksSet(Set<Integer> startBlocksSet) {
         this.startBlocksSet = startBlocksSet;
     }
+
+    public List<String> getGeneratedFilesList() {
+        return generatedFilesList;
+    }
+
 }
 

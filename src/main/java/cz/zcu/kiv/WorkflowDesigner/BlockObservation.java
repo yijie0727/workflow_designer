@@ -508,6 +508,8 @@ public class BlockObservation extends Observable implements Observer, Runnable {
             blockObject.put("stdout", stdOut);
             blockObject.put("completed", true);
 
+            List<String> generatedFilesList = blockWorkFlow.getGeneratedFilesList();
+
             JSONObject JSONOutput = new JSONObject();
             if(finalOutputObject==null){
                 JSONOutput = null;
@@ -519,7 +521,9 @@ public class BlockObservation extends Observable implements Observer, Runnable {
             }  else if (finalOutputObject.getClass().equals(File.class)){
 
                 File file = (File) finalOutputObject;
-                String destinationFileName="file_"+new Date().toString()+"_"+file.getName();
+                int random = (int)(Math.random()*100000);
+                String destinationFileName = "JID" + jobID + "_ID" + id + "_file_" + random + file.getName().replaceAll("\\s*", "");
+                if(generatedFilesList != null) generatedFilesList.add(destinationFileName);
                 FileUtils.moveFile(file, new File(outputFolder + File.separator + destinationFileName));
                 JSONOutput.put("type", "FILE");
                 JSONObject fileObject = new JSONObject();
@@ -534,7 +538,8 @@ public class BlockObservation extends Observable implements Observer, Runnable {
                 JSONOutput.put("value", table.toJSON());
 
                 int random = (int)(Math.random()*100000);
-                String destinationFileName = "table_id" + id + "_jobID" + jobID + "_" + new Date().toString() +"_" + random + ".csv";
+                String destinationFileName = "JID" + jobID + "_ID" + id + "_table_" + random + ".csv";
+                if(generatedFilesList != null) generatedFilesList.add(destinationFileName);
                 File file = new File(outputFolder + File.separator + destinationFileName);
                 FileUtils.writeStringToFile(file,table.toCSV(), Charset.defaultCharset());
 
@@ -551,7 +556,8 @@ public class BlockObservation extends Observable implements Observer, Runnable {
                 JSONOutput.put("value", graph.toJSON());
 
                 int random = (int)(Math.random()*100000);
-                String destinationFileName = "graph_id" + id + "_jobID" + jobID + "_" + new Date().toString() +"_" + random + ".json";
+                String destinationFileName = "JID" + jobID + "_ID" + id + "_graph_" + random + ".json";
+                if(generatedFilesList != null) generatedFilesList.add(destinationFileName);
                 File file = new File(outputFolder + File.separator + destinationFileName);
                 FileUtils.writeStringToFile(file, graph.toJSON().toString(4), Charset.defaultCharset());
 
