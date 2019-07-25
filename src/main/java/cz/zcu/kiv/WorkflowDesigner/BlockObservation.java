@@ -519,7 +519,7 @@ public class BlockObservation extends Observable implements Observer, Runnable {
             }  else if (finalOutputObject.getClass().equals(File.class)){
 
                 File file = (File) finalOutputObject;
-                String destinationFileName="file_"+new Date().getTime()+"_"+file.getName();
+                String destinationFileName="file_"+new Date().toString()+"_"+file.getName();
                 FileUtils.moveFile(file, new File(outputFolder + File.separator + destinationFileName));
                 JSONOutput.put("type", "FILE");
                 JSONObject fileObject = new JSONObject();
@@ -533,11 +533,10 @@ public class BlockObservation extends Observable implements Observer, Runnable {
                 JSONOutput.put("type", "TABLE");
                 JSONOutput.put("value", table.toJSON());
 
-                File file =File.createTempFile("temp_",".csv");
-                FileUtils.writeStringToFile(file,table.toCSV(), Charset.defaultCharset());
                 int random = (int)(Math.random()*100000);
-                String destinationFileName = "table_id"+id+"_jobID"+ jobID+"_" + new Date().getTime() +"_"+random  + ".csv";
-                FileUtils.moveFile(file, new File(outputFolder + File.separator + destinationFileName));
+                String destinationFileName = "table_id" + id + "_jobID" + jobID + "_" + new Date().toString() +"_" + random + ".csv";
+                File file = new File(outputFolder + File.separator + destinationFileName);
+                FileUtils.writeStringToFile(file,table.toCSV(), Charset.defaultCharset());
 
                 JSONObject fileObject=new JSONObject();
                 fileObject.put("title", destinationFileName);
@@ -551,11 +550,10 @@ public class BlockObservation extends Observable implements Observer, Runnable {
                 JSONOutput.put("type", "GRAPH");
                 JSONOutput.put("value", graph.toJSON());
 
-                File file =File.createTempFile("temp_",".json");
-                FileUtils.writeStringToFile(file, graph.toJSON().toString(4), Charset.defaultCharset());
                 int random = (int)(Math.random()*100000);
-                String destinationFileName = "graph_"+id+"_jobID"+ jobID+"_" + new Date().getTime() +"_"+random + ".json";
-                FileUtils.moveFile(file, new File(outputFolder + File.separator + destinationFileName));
+                String destinationFileName = "graph_id" + id + "_jobID" + jobID + "_" + new Date().toString() +"_" + random + ".json";
+                File file = new File(outputFolder + File.separator + destinationFileName);
+                FileUtils.writeStringToFile(file, graph.toJSON().toString(4), Charset.defaultCharset());
 
                 JSONObject fileObject=new JSONObject();
                 fileObject.put("title", destinationFileName);

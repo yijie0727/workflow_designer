@@ -382,7 +382,6 @@ public class BlockWorkFlow {
             //Initialize the block I/O/properties and configurations
 
             currBlock.initializeIO(continuousFlag, i, true);
-            System.out.println("jobId="+ jobID+ ", in workflow: mapBlockIndex: "+ currBlock.getId()+", "+currBlock.getName()+", continuousFlag[0]="+continuousFlag[0]);
             currBlock.assignProperties(blockObject);
             currBlock.setBlockObject(blockObject);
             currBlock.setOutputFolder(outputFolder);
