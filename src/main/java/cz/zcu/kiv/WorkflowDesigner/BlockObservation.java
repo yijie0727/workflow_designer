@@ -520,7 +520,7 @@ public class BlockObservation extends Observable implements Observer, Runnable {
 
                 File file = (File) finalOutputObject;
                 int random = (int)(Math.random()*100000);
-                String destinationFileName = "JID" + jobID + "_ID" + id + "_file_" + new Date().toString() + random + file.getName();
+                String destinationFileName = "JID" + jobID + "_ID" + id + "_file_" + new Date().toString() + "_"+ random + file.getName();
                 FileUtils.moveFile(file, new File(outputFolder + File.separator + destinationFileName));
                 JSONOutput.put("type", "FILE");
                 JSONObject fileObject = new JSONObject();
@@ -535,7 +535,7 @@ public class BlockObservation extends Observable implements Observer, Runnable {
                 JSONOutput.put("value", table.toJSON());
 
                 int random = (int)(Math.random()*100000);
-                String destinationFileName = "JID" + jobID + "_ID" + id + "_table_" + new Date().toString() + random + ".csv";
+                String destinationFileName = "JID" + jobID + "_ID" + id + "_table_" + new Date().toString() + "_"+  random + ".csv";
                 File file = new File(outputFolder + File.separator + destinationFileName);
                 FileUtils.writeStringToFile(file,table.toCSV(), Charset.defaultCharset());
 
@@ -552,7 +552,7 @@ public class BlockObservation extends Observable implements Observer, Runnable {
                 JSONOutput.put("value", graph.toJSON());
 
                 int random = (int)(Math.random()*100000);
-                String destinationFileName = "JID" + jobID + "_ID" + id + "_graph_" + new Date().toString() + random + ".json";
+                String destinationFileName = "JID" + jobID + "_ID" + id + "_graph_" + new Date().toString() + "_"+  random + ".json";
                 File file = new File(outputFolder + File.separator + destinationFileName);
                 FileUtils.writeStringToFile(file, graph.toJSON().toString(4), Charset.defaultCharset());
 
