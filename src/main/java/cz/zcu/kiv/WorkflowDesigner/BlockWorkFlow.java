@@ -285,7 +285,7 @@ public class BlockWorkFlow {
      * executeCumulative - Yijie Huang, Joey Pinto
      *
      * This method receives front end workflow's JSON file and to execute the workFlow.
-     * @param jObject               SONObject contains Blocks and Edges info
+     * @param jObject               JSONObject contains Blocks and Edges info
      * @param outputFolder          Folder to save the output File
      * @param workflowOutputFile    File workflowOutputFile = File.createTempFile("job_"+getId(),".json",new File(WORKING_DIRECTORY));
      *                                  -- > File to put the Blocks JSONArray info with the output info, stdout, stderr, error info after the execution
@@ -382,7 +382,6 @@ public class BlockWorkFlow {
             //Initialize the block I/O/properties and configurations
 
             currBlock.initializeIO(continuousFlag, i, true);
-            System.out.println("jobId="+ jobID+ ", in workflow: mapBlockIndex: "+ currBlock.getId()+", "+currBlock.getName()+", continuousFlag[0]="+continuousFlag[0]);
             currBlock.assignProperties(blockObject);
             currBlock.setBlockObject(blockObject);
             currBlock.setOutputFolder(outputFolder);
