@@ -12,4 +12,7 @@ public @interface BlockType {
     String description() default "";
 
     boolean runAsJar() default true;
+
+    boolean jarRMI() default false;
+
 }

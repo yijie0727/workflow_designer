@@ -35,6 +35,8 @@ public class Type {
 
     public static final String FILE = "FILE";
 
+    public static final String STREAM = "STREAM";
+
     public static final String FILE_LOCATION = "FILE_LOCATION";
 
     public static final String FILE_ARRAY = "FILE[]";
