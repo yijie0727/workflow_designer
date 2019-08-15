@@ -31,7 +31,7 @@ public class StreamToFile {
 
         try{
             OutputStream out = new FileOutputStream(outputFile);
-            byte[] bytes= new byte[43];
+            byte[] bytes= new byte[1];
 
             while(in.read(bytes)!=-1){
 

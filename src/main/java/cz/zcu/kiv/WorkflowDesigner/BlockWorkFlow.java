@@ -17,6 +17,8 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import static cz.zcu.kiv.WorkflowDesigner.BlockObservation.NORMAL;
+
 /***********************************************************************************************************************
  *
  * This file is part of the Workflow Designer project
@@ -174,9 +176,14 @@ public class BlockWorkFlow {
             BlockObservation block1 = indexBlocksMap.get(block1ID);
             String sourceParam = edge.getJSONArray("connector1").getString(0);
 
+            if(block1.getOutNum() == 0) continue;
+
             int block2ID = edge.getInt("block2");
             BlockObservation block2 = this.indexBlocksMap.get(block2ID);
             String destinationParam = edge.getJSONArray("connector2").getString(0);
+
+            Map<String, PipedInputStream> outTransitReadMap = block1.getOutTransitReadMap();
+            if(!outTransitReadMap.containsKey(sourceParam)) continue;
 
             Map<String, List<PipedOutputStream>> outTransitWriteMap = block1.getOutTransitWriteMap();
             Map<String, PipedOutputStream>   inTransitsMap = block2.getInTransitsMap();
@@ -195,16 +202,16 @@ public class BlockWorkFlow {
     public int assignPipes( ) throws IllegalAccessException, IOException{
         logger.info("assign PipedTransit for each block");
 
-        int inputsNum = 0;
+        int outputsNum = 0;
         for(int id: indexBlocksMap.keySet()){
             BlockObservation block = indexBlocksMap.get(id);
             block.assignPipeTransit();
 
-            if(block.getInputs()!= null)
-                inputsNum += block.getInputs().size();
+            if(block.getOutputs()!= null)
+                outputsNum += block.getOutNum();
         }
 
-        return inputsNum;
+        return outputsNum;
     }
 
 
@@ -222,41 +229,45 @@ public class BlockWorkFlow {
 
         JSONArray blocksArray = jObject.getJSONArray("blocks");
         JSONArray edgesArray  = jObject.getJSONArray("edges");
-        errorFlag[0] = false;
+
         //mapIndexBlock(blocksArray, outputFolder, workflowOutputFile);
 
-        int pipesInputsNum = assignPipes();
+        int pipesOutputsNum = assignPipes();
+        System.out.println("pipesOutputsNum = "+pipesOutputsNum);
 
         assignOutputWrites(edgesArray);
 
-
-        int poolSize  = blocksArray.length() + pipesInputsNum;
-        ThreadPoolExecutor threadPool = new ThreadPoolExecutor(poolSize, poolSize, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<Runnable>(poolSize), new ThreadPoolExecutor.AbortPolicy());
-
-
-        logger.info("……………………………………………………………………   Submit ContinuousBlockThread to threadPool:  ……………………………………………………………………");
-        for(int id: indexBlocksMap.keySet()){
-            BlockObservation currBlock = indexBlocksMap.get(id);
-            ContinuousBlockThread currTask = new ContinuousBlockThread(id, currBlock, errorFlag);
-            threadPool.execute(currTask);
-        }
+        int poolSize  = blocksArray.length() + pipesOutputsNum;
+        ThreadPoolExecutor threadPool = new ThreadPoolExecutor(poolSize*2, poolSize*2, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<Runnable>(poolSize), new ThreadPoolExecutor.AbortPolicy());
 
         logger.info("……………………………………………………………………   Submit PipeTransitThread to threadPool:  ………………………………………………………………………………");
         for(int id: indexBlocksMap.keySet()){
             BlockObservation block = indexBlocksMap.get(id);
-            if(block.getOutTransitReadMap()  == null) continue; // skip blocks without outputs(the las blocks in the workFlows)
+            if( block.getOutNum() == 0 || block.getBlockModel()==NORMAL) continue; // skip blocks without outputs(the last blocks in the workFlows)
 
             Map<String, PipedInputStream>        outTransitReadMap  = block.getOutTransitReadMap();
             Map<String, List<PipedOutputStream>> outTransitWriteMap = block.getOutTransitWriteMap();
 
+            for(BlockObservation destBlock: block.getDestinationObservers()){
+                Map<String, PipedOutputStream>   inTransitsMap = destBlock.getInTransitsMap();
+                logger.info( "id: "+ block.getId() + ", destID: "+ destBlock.getId() + " sour outTransitWriteMap: "+ outTransitWriteMap);
+                logger.info( "id: "+ block.getId() + ", destID: "+ destBlock.getId() + " dest inTransitsMap:      "+ inTransitsMap);
+            }
             for(String outputName: outTransitReadMap.keySet()){
 
                 PipedInputStream pipedInTransit = outTransitReadMap.get(outputName);
                 List<PipedOutputStream> pipedOutTransitsList = outTransitWriteMap.get(outputName);
 
-                threadPool.execute(  new PipeTransitThread(id, outputName,  pipedInTransit,  pipedOutTransitsList)  );
+                threadPool.execute(  new PipeTransitThread(block, outputName,  pipedInTransit,  pipedOutTransitsList)  );
 
             }
+        }
+        logger.info("……………………………………………………………………   Submit all the blocks to threadPool directly :  ……………………………………………………………………");
+        for(int id: indexBlocksMap.keySet()){
+            BlockObservation currBlock = indexBlocksMap.get(id);
+
+            ContinuousBlockThread currTask = new ContinuousBlockThread(id, currBlock, errorFlag);
+            threadPool.execute(currTask);
         }
 
         threadPool.shutdown();
@@ -297,10 +308,6 @@ public class BlockWorkFlow {
 
         //initialize  and  set  map<ID,  BlockObservation> indexBlocksMap(config I/Os and assign properties)
         mapIndexBlock(blocksArray, outputFolder, workflowOutputFile);
-        if(continuousFlag[0])
-            return executeContinuous(jObject);
-
-        logger.info("  Start Cumulative WorkFlow Execution …………………… ");
 
         count[0] = blocksArray.length();
         errorFlag[0] = false;
@@ -310,6 +317,11 @@ public class BlockWorkFlow {
 
         //add observers to their corresponding observables (add destination blocks to their corresponding source blocks)
         registerObservers();
+
+        if(continuousFlag[0])
+            return executeContinuous(jObject);
+
+        logger.info("  Start Cumulative WorkFlow Execution …………………… ");
 
 
         logger.info("………………………………………………………………………………………………  Start the threads for blocks in the start list:  ………………………………………………………………………………………………………………… ");

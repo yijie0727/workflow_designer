@@ -101,6 +101,13 @@ public class BlockObservation extends Observable implements Observer, Runnable {
 
 
     //Fields for continuous stream model (no cumulative data in blocks) (pipe)
+    public static final int NORMAL = 0; // if all its @BlockOutput / @BlockInput are Normal data
+    public static final int MIX    = 1; // if its @BlockOutput / @BlockInput has both PipedOut/InputStream and Normal data
+    public static final int PIPE   = 2; // if all its @BlockOutput / @BlockInput are PipedOut/InputStream
+    private int blockModel = NORMAL;
+    private int inNum  = 0;  // nums for @BlockInput  PipedInputStream
+    private int outNum = 0;  // nums for @BlockOutput PipedOutputStream
+
     private PipedOutputStream[] pipedOuts;
     private PipedInputStream[] pipedInsTransit;
     private PipedOutputStream[] pipedOutsTransit;
@@ -121,6 +128,26 @@ public class BlockObservation extends Observable implements Observer, Runnable {
         this.workflowOutputFile = workflowOutputFile;
     }
 
+    // return error flag
+    public boolean checkSourcePrepared() {
+        // check whether the previous blocks are all executed completely
+        for( BlockObservation sourceBlock: sourceObservables) {
+
+            try{
+                while((!sourceBlock.isComplete())) {
+System.out.println("for blockID: "+ id + "source BlockId" + sourceBlock.getId() + " is not ready.");
+                    Thread.sleep(500);
+                    if(  errorFlag[0] ) return true;
+                }
+            } catch (InterruptedException e){
+                logger.error(e);
+                errorFlag[0] = true;
+            }
+        }
+
+        return errorFlag[0];
+    }
+
 
     /**
      * assignPipeTransit - Yijie Huang
@@ -130,16 +157,14 @@ public class BlockObservation extends Observable implements Observer, Runnable {
      */
     public void assignPipeTransit() throws IllegalAccessException, IOException {
 
-        int outNum = 0, inNum = 0;
+      if (blockModel == NORMAL) return;
 
-        if( outputs != null && outputs.size() != 0) {
-            outNum = outputs.size();
+        if( outputs != null && outNum != 0) {
             pipedOuts       = new PipedOutputStream[outNum];
             pipedInsTransit = new PipedInputStream[outNum];
         }
 
-        if( inputs != null  && inputs.size() != 0) {
-            inNum = inputs.size();
+        if( inputs  != null && inNum  != 0) {
             pipedOutsTransit = new PipedOutputStream[inNum];
             pipedIns         = new PipedInputStream[inNum];
         }
@@ -157,6 +182,10 @@ public class BlockObservation extends Observable implements Observer, Runnable {
                 BlockOutput blockOutput = f.getAnnotation(BlockOutput.class);
                 if (blockOutput != null) {
 
+                    //not PIPE model
+                    if( !"PipedOutputStream".equals(f.getType().getSimpleName()) ){
+                        continue;
+                    }
                     pipedOuts[i] = (PipedOutputStream) f.get(context);
                     pipedInsTransit[i] = new PipedInputStream();
                     pipedOuts[i].connect(pipedInsTransit[i]);
@@ -179,6 +208,11 @@ public class BlockObservation extends Observable implements Observer, Runnable {
 
                 BlockInput blockInput = f.getAnnotation(BlockInput.class);
                 if (blockInput != null) {
+
+                    //not PIPE model
+                    if( !"PipedInputStream".equals(f.getType().getSimpleName()) ){
+                        continue;
+                    }
 
                     pipedOutsTransit[j] = new PipedOutputStream();
                     pipedIns[j] = (PipedInputStream) f.get(context);
@@ -368,7 +402,7 @@ public class BlockObservation extends Observable implements Observer, Runnable {
      * @return output returned by BlockExecute Method
      * @throws Exception when output file is not created
      */
-    private Object executeAsJar(StringBuilder stdOut, StringBuilder stdErr) throws Exception {
+    public Object executeAsJar(StringBuilder stdOut, StringBuilder stdErr) throws Exception {
         logger.info("Executing id = " + getId() + ", name = " + getName() + " as a JAR." + ", in jobID " + jobID);
 
         Object output = null;
@@ -627,6 +661,10 @@ public class BlockObservation extends Observable implements Observer, Runnable {
 
                     BlockOutput blockOutput = f.getAnnotation(BlockOutput.class);
                     if (blockOutput != null) {
+
+                        if("PipedOutputStream".equals(f.getType().getSimpleName()) ){
+                            continue;
+                        }
                         if (blockOutput.name().equals(sourceParam)) {
                             sourceOut = f.get(sourceBlock.getContext());
                             break;
@@ -644,6 +682,11 @@ public class BlockObservation extends Observable implements Observer, Runnable {
                 BlockInput blockInput = f.getAnnotation(BlockInput.class);
 
                 if (blockInput != null) {
+
+                    if("PipedInputStream".equals(f.getType().getSimpleName()) ){
+                        continue;
+                    }
+
                     if (blockInput.name().equals(destinationParam)) {
                         if(!blockInput.type().endsWith("[]")){ // input not comes from multiple outputs
                             f.set(this.context, components.get(0));
@@ -675,8 +718,6 @@ public class BlockObservation extends Observable implements Observer, Runnable {
      */
     public void initializeIO(boolean[] continuousFlag, int num,  boolean workFlowFlag) throws WrongTypeException{
 
-        boolean tmpFlag = false;
-
         if(getProperties()==null)
             setProperties(new HashMap<String,Property>());
         if(getInputs()==null)
@@ -688,6 +729,7 @@ public class BlockObservation extends Observable implements Observer, Runnable {
 
         for (Field f: context.getClass().getDeclaredFields()) {
             f.setAccessible(true);
+            boolean tmpFlag = false;
 
             BlockProperty blockProperty = f.getAnnotation(BlockProperty.class);
             if (blockProperty != null){
@@ -704,8 +746,9 @@ public class BlockObservation extends Observable implements Observer, Runnable {
                 }
 
                 //if this block wants to deal with the stream data in a continuous way through pipe In and Out transfer(PipedOutPutStream To PipedInputStream)
-                if( workFlowFlag && ("PipedOutputStream".equals(f.getType().getSimpleName()) || "PipedInputStream".equals(f.getType().getSimpleName())) ){
+                if( workFlowFlag &&  "PipedInputStream".equals(f.getType().getSimpleName()) ){
                     tmpFlag = true;
+                    inNum++;
                 }
 
                 String cardinality="";
@@ -725,8 +768,9 @@ public class BlockObservation extends Observable implements Observer, Runnable {
                     this.setStream(false);
                 }
 
-                if( workFlowFlag && ("PipedOutputStream".equals(f.getType().getSimpleName()) || "PipedInputStream".equals(f.getType().getSimpleName())) ){
+                if( workFlowFlag && "PipedOutputStream".equals(f.getType().getSimpleName()) ){
                     tmpFlag = true;
+                    outNum++;
                 }
 
                 String cardinality="";
@@ -737,20 +781,19 @@ public class BlockObservation extends Observable implements Observer, Runnable {
 
             if(!workFlowFlag ) continue;
 
-            if(num == 0){
-                continuousFlag[0] = tmpFlag;
-
-            } else {
-
-                if(continuousFlag[0] != tmpFlag){
-                    throw new WrongTypeException();
-                }
-            }
+            continuousFlag[0] = tmpFlag || continuousFlag[0];  // as long as there is one PipedInputStream or one PipedOutputStream, then the workFlowContinuous Flag should be true
 
         }
-
         logger.info("Initialized I/O/properties of BlockID "+getId()+", name "+getName()+" block from annotations"+", in jobID "+jobID);
 
+        if(!workFlowFlag ) return;
+
+        if(inNum == 0 && outNum == 0)
+            blockModel = NORMAL;
+        else if (inNum != inputs.size() || outNum != outputs.size() )
+            blockModel = MIX;
+        else
+            blockModel = PIPE;
     }
 
 
@@ -1227,5 +1270,21 @@ public class BlockObservation extends Observable implements Observer, Runnable {
 
     public void setOutTransitWriteMap(Map<String, List<PipedOutputStream>> outTransitWriteMap) {
         this.outTransitWriteMap = outTransitWriteMap;
+    }
+
+    public int getBlockModel() {
+        return blockModel;
+    }
+
+    public void setBlockModel(int blockModel) {
+        this.blockModel = blockModel;
+    }
+
+    public int getOutNum() {
+        return outNum;
+    }
+
+    public void setOutNum(int outNum) {
+        this.outNum = outNum;
     }
 }
