@@ -1,7 +1,7 @@
- ![Google Summer of Code img](https://4.bp.blogspot.com/-AY7eIsmbH0Y/WLRdpe78DJI/AAAAAAAABDU/lsb2XqcmyUsLqYo6yzo9HYMY4vLn3q_OgCLcB/s1600/vertical%2BGSoC%2Blogo.jpg)
- 
  # INCF Workflow Designer
- 
+  
+ ![Google Summer of Code img](https://4.bp.blogspot.com/-AY7eIsmbH0Y/WLRdpe78DJI/AAAAAAAABDU/lsb2XqcmyUsLqYo6yzo9HYMY4vLn3q_OgCLcB/s1600/vertical%2BGSoC%2Blogo.jpg)
+
  ## Overview
  - This project aims at building an easy to use graphical interface that can streamline the configuration of the parameters
  controlling individual processing sub-routines and thus make it easy to design complicated data flows and execute them.  
@@ -12,7 +12,7 @@
  computing frameworks.
  
  - This project has been developed as a part of Google Summer of Code 2018 by [Joey Pinto](https://github.com/pintojoey) 
- and Google Summer of Code 2019 [Yijie Huang](https://github.com/yijie0727) under the mentorship of the International 
+ and Google Summer of Code 2019 by [Yijie Huang](https://github.com/yijie0727) under the mentorship of the International 
  Neuroinformatics Coordinating Facility, Sweden.
  
  - In GSoC2018 phase, this maven project was mainly focused on the development of web-based GUI and configurable workflow 
