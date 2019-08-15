@@ -23,7 +23,7 @@
  without waiting the previous blocks finishing execution). 
  
  
- ## Guidelines
+ ##Contribution Guidelines
  
  ### Code Structure
  
