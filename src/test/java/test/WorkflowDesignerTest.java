@@ -48,7 +48,7 @@ import java.util.Map;
  **********************************************************************************************************************/
 public class WorkflowDesignerTest {
 
-    @Test
+   // @Test
     public void testBlock() throws NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException {
         JSONArray blocksArray=new BlockWorkFlow(ClassLoader.getSystemClassLoader(),":test",null,"").initializeBlocks();
         assert blocksArray.length()==9;
