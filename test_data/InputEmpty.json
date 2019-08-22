@@ -1,0 +1,129 @@
+{
+  "edges": [
+    {
+      "id": 1,
+      "block1": 5,
+      "connector1": [
+        "targetPets",
+        "output"
+      ],
+      "block2": 3,
+      "connector2": [
+        "TargetPets",
+        "input"
+      ]
+    },
+    {
+      "id": 2,
+      "block1": 6,
+      "connector1": [
+        "targetPets",
+        "output"
+      ],
+      "block2": 4,
+      "connector2": [
+        "TargetPets",
+        "input"
+      ]
+    },
+    {
+      "id": 3,
+      "block1": 1,
+      "connector1": [
+        "mixedPets",
+        "output"
+      ],
+      "block2": 5,
+      "connector2": [
+        "petsIn2",
+        "input"
+      ]
+    },
+    {
+      "id": 4,
+      "block1": 1,
+      "connector1": [
+        "mixedPets",
+        "output"
+      ],
+      "block2": 6,
+      "connector2": [
+        "petsIn2",
+        "input"
+      ]
+    },
+    {
+      "id": 5,
+      "block1": 2,
+      "connector1": [
+        "mixedPets",
+        "output"
+      ],
+      "block2": 5,
+      "connector2": [
+        "petsIn1",
+        "input"
+      ]
+    }
+  ],
+  "blocks": [
+    {
+      "id": 1,
+      "x": -495,
+      "y": -173,
+      "type": "MixedPets",
+      "module": "test.jar:test",
+      "values": {
+        "petsNames": "apple, meow, melody, marine, kiwi, bigPie, lucky",
+        "petsTypes": " dog, cat, bird, fish, bird, dog, cat"
+      }
+    },
+    {
+      "id": 2,
+      "x": -494,
+      "y": 39,
+      "type": "MixedPets",
+      "module": "test.jar:test",
+      "values": {
+        "petsNames": "pie, wow, yoki, akaya, jiXiang, Good",
+        "petsTypes": "dog, dog, cat, dog, cat, fish"
+      }
+    },
+    {
+      "id": 3,
+      "x": 81,
+      "y": -130,
+      "type": "TargetPet",
+      "module": "test.jar:test",
+      "values": {}
+    },
+    {
+      "id": 4,
+      "x": 101,
+      "y": 105,
+      "type": "TargetPet",
+      "module": "test.jar:test",
+      "values": {}
+    },
+    {
+      "id": 5,
+      "x": -225,
+      "y": -112,
+      "type": "PetFilter",
+      "module": "test.jar:test",
+      "values": {
+        "targetPetType": "cat"
+      }
+    },
+    {
+      "id": 6,
+      "x": -225,
+      "y": 70,
+      "type": "PetFilter",
+      "module": "test.jar:test",
+      "values": {
+        "targetPetType": "dog"
+      }
+    }
+  ]
+}

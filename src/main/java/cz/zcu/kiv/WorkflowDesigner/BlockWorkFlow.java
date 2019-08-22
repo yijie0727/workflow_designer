@@ -8,6 +8,7 @@ import org.json.JSONObject;
 import org.reflections.Reflections;
 
 import java.io.IOException;
+import java.io.ObjectOutputStream;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.lang.annotation.Annotation;
@@ -182,6 +183,11 @@ public class BlockWorkFlow {
             BlockObservation block2 = this.indexBlocksMap.get(block2ID);
             String destinationParam = edge.getJSONArray("connector2").getString(0);
 
+            Map<String, Integer> inTransitNumMap = block2.getInTransitNumMap();
+            if(inTransitNumMap.containsKey(destinationParam))
+                inTransitNumMap.put(destinationParam, inTransitNumMap.get(destinationParam)+1);
+
+
             Map<String, PipedInputStream> outTransitReadMap = block1.getOutTransitReadMap();
             if(!outTransitReadMap.containsKey(sourceParam)) continue;
 
@@ -195,6 +201,38 @@ public class BlockWorkFlow {
         }
 
     }
+
+    /**
+     * emptyPipedIn -Yijie Huang
+     * deal with the problem when input is PipedInputStream and No BlockOutput is connected with it
+     */
+    public void emptyPipedIn() throws IOException{
+        for(int id: indexBlocksMap.keySet()){
+            BlockObservation block = indexBlocksMap.get(id);
+            Map<String, Integer>            inTransitNumMap = block.getInTransitNumMap();
+            Map<String, PipedOutputStream>  inTransitsMap   = block.getInTransitsMap();
+
+            if(inTransitNumMap == null) continue;
+
+            System.out.println("inTransitNumMap = "+ inTransitNumMap);
+
+            for(String inputName: inTransitNumMap.keySet()) {
+                int cnt = inTransitNumMap.get(inputName);
+                //means the previous blocks don't have their BlockOutput to this input
+                if(cnt == 0) {
+
+                    PipedOutputStream pipedOutsTransit = inTransitsMap.get(inputName);
+                    ObjectOutputStream objectOutStream = new ObjectOutputStream(pipedOutsTransit);
+
+                    objectOutStream.writeObject(null);
+                    objectOutStream.flush();
+                    objectOutStream.close();
+                    pipedOutsTransit.close();
+                }
+            }
+        }
+    }
+
 
     /**
      * assignPipes - Yijie Huang
@@ -236,6 +274,8 @@ public class BlockWorkFlow {
         System.out.println("pipesOutputsNum = "+pipesOutputsNum);
 
         assignOutputWrites(edgesArray);
+
+        emptyPipedIn();
 
         int poolSize  = blocksArray.length() + pipesOutputsNum;
         ThreadPoolExecutor threadPool = new ThreadPoolExecutor(poolSize*2, poolSize*2, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<Runnable>(poolSize), new ThreadPoolExecutor.AbortPolicy());

@@ -54,7 +54,7 @@ public class WorkflowDesignerTest {
         assert blocksArray.length()==9;
     }
 
-    @Test
+    //@Test
     public void testJSONArithmeticObservation() throws WrongTypeException, IOException, NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException, FieldMismatchException, InterruptedException {
 
         String json = FileUtils.readFileToString(new File("test_data/test.json"),Charset.defaultCharset());
@@ -81,7 +81,7 @@ public class WorkflowDesignerTest {
     }
 
 
-    @Test
+    //@Test
     public void testFileToStreamToFileObservation() throws WrongTypeException, IOException, NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException, FieldMismatchException, InterruptedException{
         String json = FileUtils.readFileToString(new File("test_data/FileToStreamTest.json"), Charset.defaultCharset());
 
@@ -106,7 +106,7 @@ public class WorkflowDesignerTest {
     }
 
 
-    @Test
+    //@Test
     public void testContinuous() throws WrongTypeException, IOException, NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException, FieldMismatchException, InterruptedException{
         String json = FileUtils.readFileToString(new File("test_data/pipedStreamTest.json"), Charset.defaultCharset());
 
@@ -131,7 +131,30 @@ public class WorkflowDesignerTest {
     }
 
 
+    @Test
+    public void testInputEmpty() throws WrongTypeException, IOException, NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException, FieldMismatchException, InterruptedException{
+        String json = FileUtils.readFileToString(new File("test_data/InputEmpty.json"), Charset.defaultCharset());
 
+        JSONObject jsonObject = new JSONObject(json);
+        File outputFile = File.createTempFile("testInputEmpty",".json");
+        outputFile.deleteOnExit();
+
+        JSONArray blocksArray = jsonObject.getJSONArray("blocks");
+        List<String> blockTypes = new ArrayList<>();
+        for (int i = 0; i < blocksArray.length(); i++) {
+            JSONObject blockObject = blocksArray.getJSONObject(i);
+            blockTypes.add(blockObject.getString("type"));
+        }
+        Map<Class, String> moduleSource = new HashMap<>();
+        Pack.assignModuleSource(moduleSource, blockTypes);
+
+
+        JSONArray jsonArray = new BlockWorkFlow(ClassLoader.getSystemClassLoader(), moduleSource, null,"test_data",4)
+                .execute(jsonObject,"test_data",outputFile.getAbsolutePath());
+        System.out.println(jsonArray);
+        assert jsonArray !=null;
+        assert jsonArray.length() == 6;
+    }
 
     //@Test
     public void testPack() throws IOException, NoSuchMethodException, InvocationTargetException, IllegalAccessException{

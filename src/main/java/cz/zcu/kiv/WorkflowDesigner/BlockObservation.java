@@ -113,6 +113,7 @@ public class BlockObservation extends Observable implements Observer, Runnable {
     private PipedOutputStream[] pipedOutsTransit;
     private PipedInputStream[] pipedIns;
     private Map<String, PipedOutputStream>   inTransitsMap;            //store Map<inputName(unique annotation name):  corresponding pipedOutsTransit     (connect this block's input's PipedInTransit)>
+    private Map<String, Integer> inTransitNumMap;
     private Map<String, PipedInputStream>    outTransitReadMap;        //store Map<outputName(unique annotation name): corresponding pipedInsTransit      (connect this block's output's PipedInTransit)>
     private Map<String, List<PipedOutputStream>> outTransitWriteMap;   //store Map<outputName(unique annotation name): corresponding pipedOutsTransitList (connect next blocks' input's PipeOutTransit)>
 
@@ -165,6 +166,7 @@ System.out.println("for blockID: "+ id + "source BlockId" + sourceBlock.getId() 
         }
 
         if( inputs  != null && inNum  != 0) {
+            System.out.println(" blockID: "+ id + " inNum = "+ inNum );
             pipedOutsTransit = new PipedOutputStream[inNum];
             pipedIns         = new PipedInputStream[inNum];
         }
@@ -201,6 +203,7 @@ System.out.println("for blockID: "+ id + "source BlockId" + sourceBlock.getId() 
         // connect pipedOutputTransits and original inputs pipedInputStream
         if(inNum != 0){
             inTransitsMap = new HashMap<>();
+            inTransitNumMap = new HashMap<>();
             int j = 0;
             Field[] inputFields =  context.getClass().getDeclaredFields();
             for (Field f : inputFields) {
@@ -219,6 +222,7 @@ System.out.println("for blockID: "+ id + "source BlockId" + sourceBlock.getId() 
                     pipedOutsTransit[j].connect(pipedIns[j]);
 
                     inTransitsMap.put(blockInput.name(), pipedOutsTransit[j]);
+                    inTransitNumMap.put(blockInput.name(), 0);
 
                     j++;
 
@@ -1286,5 +1290,13 @@ System.out.println("for blockID: "+ id + "source BlockId" + sourceBlock.getId() 
 
     public void setOutNum(int outNum) {
         this.outNum = outNum;
+    }
+
+    public Map<String, Integer> getInTransitNumMap() {
+        return inTransitNumMap;
+    }
+
+    public void setInTransitNumMap(Map<String, Integer> inTransitNumMap) {
+        this.inTransitNumMap = inTransitNumMap;
     }
 }
