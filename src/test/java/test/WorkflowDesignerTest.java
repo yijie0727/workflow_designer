@@ -106,7 +106,7 @@ public class WorkflowDesignerTest {
     }
 
 
-    //@Test
+    @Test
     public void testContinuous() throws WrongTypeException, IOException, NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException, FieldMismatchException, InterruptedException{
         String json = FileUtils.readFileToString(new File("test_data/pipedStreamTest.json"), Charset.defaultCharset());
 
@@ -131,7 +131,7 @@ public class WorkflowDesignerTest {
     }
 
 
-    @Test
+    //@Test
     public void testInputEmpty() throws WrongTypeException, IOException, NoSuchMethodException, InstantiationException, IllegalAccessException, InvocationTargetException, FieldMismatchException, InterruptedException{
         String json = FileUtils.readFileToString(new File("test_data/InputEmpty.json"), Charset.defaultCharset());
 

@@ -26,6 +26,8 @@ public class PetFilter {
     @BlockOutput(name = "targetPets", type = STREAM)
     PipedOutputStream pipedOut = new PipedOutputStream();
 
+    @BlockOutput(name = "targetPets2", type = STREAM)
+    PipedOutputStream pipedOut2 = new PipedOutputStream();
 
 
     @BlockExecute
@@ -34,6 +36,7 @@ public class PetFilter {
         ObjectInputStream objectInStream1 = new ObjectInputStream(pipedIn1);
         ObjectInputStream objectInStream2 = new ObjectInputStream(pipedIn2);
         ObjectOutputStream objectOutStream = new ObjectOutputStream(pipedOut);
+        ObjectOutputStream objectOutStream2 = new ObjectOutputStream(pipedOut2);
 
         Pet pet1;
         Pet pet2;
@@ -63,6 +66,10 @@ public class PetFilter {
         pipedIn1.close();
         pipedIn2.close();
         pipedOut.close();
+
+        objectOutStream2.close();
+        pipedOut2.close();
+
     }
 
 

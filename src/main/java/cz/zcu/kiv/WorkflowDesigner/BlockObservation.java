@@ -114,6 +114,7 @@ public class BlockObservation extends Observable implements Observer, Runnable {
     private PipedInputStream[] pipedIns;
     private Map<String, PipedOutputStream>   inTransitsMap;            //store Map<inputName(unique annotation name):  corresponding pipedOutsTransit     (connect this block's input's PipedInTransit)>
     private Map<String, Integer> inTransitNumMap;
+    private Map<String, Integer> outTransitNumMap;
     private Map<String, PipedInputStream>    outTransitReadMap;        //store Map<outputName(unique annotation name): corresponding pipedInsTransit      (connect this block's output's PipedInTransit)>
     private Map<String, List<PipedOutputStream>> outTransitWriteMap;   //store Map<outputName(unique annotation name): corresponding pipedOutsTransitList (connect next blocks' input's PipeOutTransit)>
 
@@ -161,6 +162,7 @@ System.out.println("for blockID: "+ id + "source BlockId" + sourceBlock.getId() 
       if (blockModel == NORMAL) return;
 
         if( outputs != null && outNum != 0) {
+            System.out.println(" blockID: "+ id + " outNum = "+ outNum );
             pipedOuts       = new PipedOutputStream[outNum];
             pipedInsTransit = new PipedInputStream[outNum];
         }
@@ -175,7 +177,7 @@ System.out.println("for blockID: "+ id + "source BlockId" + sourceBlock.getId() 
         if(outNum != 0){
             outTransitReadMap  = new HashMap<>();
             outTransitWriteMap = new HashMap<>();  //empty now, entity will be put in BlockWorkFlow.java
-
+            outTransitNumMap   = new HashMap<>();
             int i = 0;
             Field[] outputFields = context.getClass().getDeclaredFields();
             for (Field f : outputFields) {
@@ -193,6 +195,7 @@ System.out.println("for blockID: "+ id + "source BlockId" + sourceBlock.getId() 
                     pipedOuts[i].connect(pipedInsTransit[i]);
 
                     outTransitReadMap.put(blockOutput.name(), pipedInsTransit[i]);
+                    outTransitNumMap.put(blockOutput.name(), 0);
 
                     i++;
 
@@ -1298,5 +1301,13 @@ System.out.println("for blockID: "+ id + "source BlockId" + sourceBlock.getId() 
 
     public void setInTransitNumMap(Map<String, Integer> inTransitNumMap) {
         this.inTransitNumMap = inTransitNumMap;
+    }
+
+    public Map<String, Integer> getOutTransitNumMap() {
+        return outTransitNumMap;
+    }
+
+    public void setOutTransitNumMap(Map<String, Integer> outTransitNumMap) {
+        this.outTransitNumMap = outTransitNumMap;
     }
 }

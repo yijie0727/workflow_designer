@@ -183,6 +183,10 @@ public class BlockWorkFlow {
             BlockObservation block2 = this.indexBlocksMap.get(block2ID);
             String destinationParam = edge.getJSONArray("connector2").getString(0);
 
+            Map<String, Integer> outTransitNumMap = block1.getOutTransitNumMap();
+            if(outTransitNumMap.containsKey(sourceParam))
+                outTransitNumMap.put(sourceParam, outTransitNumMap.get(sourceParam)+1);
+
             Map<String, Integer> inTransitNumMap = block2.getInTransitNumMap();
             if(inTransitNumMap.containsKey(destinationParam))
                 inTransitNumMap.put(destinationParam, inTransitNumMap.get(destinationParam)+1);
@@ -288,18 +292,20 @@ public class BlockWorkFlow {
             Map<String, PipedInputStream>        outTransitReadMap  = block.getOutTransitReadMap();
             Map<String, List<PipedOutputStream>> outTransitWriteMap = block.getOutTransitWriteMap();
 
+            Map<String, Integer>                 outTransitNumMap   = block.getOutTransitNumMap();
+
             for(BlockObservation destBlock: block.getDestinationObservers()){
                 Map<String, PipedOutputStream>   inTransitsMap = destBlock.getInTransitsMap();
                 logger.info( "id: "+ block.getId() + ", destID: "+ destBlock.getId() + " sour outTransitWriteMap: "+ outTransitWriteMap);
                 logger.info( "id: "+ block.getId() + ", destID: "+ destBlock.getId() + " dest inTransitsMap:      "+ inTransitsMap);
             }
             for(String outputName: outTransitReadMap.keySet()){
-
                 PipedInputStream pipedInTransit = outTransitReadMap.get(outputName);
-                List<PipedOutputStream> pipedOutTransitsList = outTransitWriteMap.get(outputName);
-
-                threadPool.execute(  new PipeTransitThread(block, outputName,  pipedInTransit,  pipedOutTransitsList)  );
-
+                int cnt = outTransitNumMap.get(outputName);
+                if(cnt != 0) { //means the current blocks don't have their BlockOutput to next input
+                    List<PipedOutputStream> pipedOutTransitsList = outTransitWriteMap.get(outputName);
+                    threadPool.execute(  new PipeTransitThread(block, outputName,  pipedInTransit,  pipedOutTransitsList)  );
+                }
             }
         }
         logger.info("……………………………………………………………………   Submit all the blocks to threadPool directly :  ……………………………………………………………………");
@@ -319,7 +325,23 @@ public class BlockWorkFlow {
         threadPool.shutdownNow();
         logger.info("………………………………………………………………………………………  ShutDown threadPool  …………………………………………………………………………………………………………………… ");
 
+        //close the unconnected @BlockOutput(PipedOutputStream's connected PipedInputStream(PipedInTransit))
+        for(int id: indexBlocksMap.keySet()){
+            BlockObservation block = indexBlocksMap.get(id);
+            if( block.getOutNum() == 0 || block.getBlockModel()==NORMAL) continue; // skip blocks without outputs(the last blocks in the workFlows)
 
+            Map<String, PipedInputStream>        outTransitReadMap  = block.getOutTransitReadMap();
+            Map<String, Integer>                 outTransitNumMap   = block.getOutTransitNumMap();
+
+            for(String outputName: outTransitReadMap.keySet()){
+                PipedInputStream pipedInTransit = outTransitReadMap.get(outputName);
+                int cnt = outTransitNumMap.get(outputName);
+                if(cnt == 0) {
+                    System.out.println("unconnected outputName = "+outputName+"， pipedInTransit = "+pipedInTransit);
+                    pipedInTransit.close();
+                }
+            }
+        }
 
 
         if(!errorFlag[0])
